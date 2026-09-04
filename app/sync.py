@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import datetime
 import csv
 
 from . import db
@@ -13,10 +14,7 @@ from .models import (
 
 
 def _read_csv(path):
-    """
-    Read a CSV file and return its rows as dictionaries.
-    Returns an empty list if the file does not exist.
-    """
+    """Read a CSV file and return its rows."""
 
     if not path.exists():
         return []
@@ -27,19 +25,15 @@ def _read_csv(path):
         encoding="utf-8-sig"
     ) as f:
 
-        return list(
-            csv.DictReader(f)
-        )
+        return list(csv.DictReader(f))
 
 
-def sync_from_csv(app):
+def sync_data_files(app):
     """
-    Synchronize static CSV data with the database.
+    Synchronize CSV data files with the database.
 
-    Audits are treated carefully because department heads
-    can add audits directly through the application.
-    Those audits are already written back to audits.csv
-    by admin.py.
+    The function name is intentionally kept as
+    sync_data_files because app/__init__.py imports it.
     """
 
     data_folder = Path(
@@ -52,12 +46,8 @@ def sync_from_csv(app):
         # COMMON URLS
         # =================================================
 
-        common_urls_file = (
-            data_folder / "common_urls.csv"
-        )
-
         rows = _read_csv(
-            common_urls_file
+            data_folder / "common_urls.csv"
         )
 
         CommonURL.query.delete()
@@ -71,20 +61,16 @@ def sync_from_csv(app):
                 CommonURL(
                     name=row.get("name", "").strip(),
                     description=row.get(
-                        "description",
-                        ""
+                        "description", ""
                     ).strip(),
                     category=row.get(
-                        "category",
-                        ""
+                        "category", ""
                     ).strip(),
                     department=row.get(
-                        "department",
-                        ""
+                        "department", ""
                     ).strip(),
                     url=row.get(
-                        "url",
-                        ""
+                        "url", ""
                     ).strip()
                 )
             )
@@ -94,12 +80,8 @@ def sync_from_csv(app):
         # DEPARTMENTS
         # =================================================
 
-        departments_file = (
-            data_folder / "departments.csv"
-        )
-
         rows = _read_csv(
-            departments_file
+            data_folder / "departments.csv"
         )
 
         Department.query.delete()
@@ -112,53 +94,43 @@ def sync_from_csv(app):
             db.session.add(
                 Department(
                     name=row.get(
-                        "name",
-                        ""
+                        "name", ""
                     ).strip(),
 
                     head_name=row.get(
-                        "head_name",
-                        ""
+                        "head_name", ""
                     ).strip(),
 
                     designation=row.get(
-                        "designation",
-                        ""
+                        "designation", ""
                     ).strip(),
 
                     email=row.get(
-                        "email",
-                        ""
+                        "email", ""
                     ).strip(),
 
                     phone=row.get(
-                        "phone",
-                        ""
+                        "phone", ""
                     ).strip(),
 
                     extension=row.get(
-                        "extension",
-                        ""
+                        "extension", ""
                     ).strip(),
 
                     office=row.get(
-                        "office",
-                        ""
+                        "office", ""
                     ).strip(),
 
                     floor=row.get(
-                        "floor",
-                        ""
+                        "floor", ""
                     ).strip(),
 
                     room=row.get(
-                        "room",
-                        ""
+                        "room", ""
                     ).strip(),
 
                     description=row.get(
-                        "description",
-                        ""
+                        "description", ""
                     ).strip()
                 )
             )
@@ -168,12 +140,8 @@ def sync_from_csv(app):
         # HOLIDAYS
         # =================================================
 
-        holidays_file = (
-            data_folder / "holidays.csv"
-        )
-
         rows = _read_csv(
-            holidays_file
+            data_folder / "holidays.csv"
         )
 
         Holiday.query.delete()
@@ -182,8 +150,6 @@ def sync_from_csv(app):
 
             if not row.get("name") or not row.get("date"):
                 continue
-
-            from datetime import datetime
 
             try:
 
@@ -199,8 +165,7 @@ def sync_from_csv(app):
             db.session.add(
                 Holiday(
                     name=row.get(
-                        "name",
-                        ""
+                        "name", ""
                     ).strip(),
 
                     date=holiday_date,
@@ -216,27 +181,12 @@ def sync_from_csv(app):
         # =================================================
         # AUDITS
         # =================================================
-        #
-        # IMPORTANT:
-        # admin.py now writes newly created audits into
-        # audits.csv.
-        #
-        # Therefore it is safe for sync to rebuild the
-        # Audit table from the CSV.
-        #
-        # =================================================
 
-        audits_file = (
+        rows = _read_csv(
             data_folder / "audits.csv"
         )
 
-        rows = _read_csv(
-            audits_file
-        )
-
         Audit.query.delete()
-
-        from datetime import datetime
 
         for row in rows:
 
@@ -275,23 +225,19 @@ def sync_from_csv(app):
             db.session.add(
                 Audit(
                     name=row.get(
-                        "name",
-                        ""
+                        "name", ""
                     ).strip(),
 
                     department=row.get(
-                        "department",
-                        ""
+                        "department", ""
                     ).strip(),
 
                     audit_type=row.get(
-                        "audit_type",
-                        ""
+                        "audit_type", ""
                     ).strip(),
 
                     auditor=row.get(
-                        "auditor",
-                        ""
+                        "auditor", ""
                     ).strip(),
 
                     audit_date=audit_date,
@@ -310,12 +256,8 @@ def sync_from_csv(app):
         # TRAINING
         # =================================================
 
-        training_file = (
-            data_folder / "training.csv"
-        )
-
         rows = _read_csv(
-            training_file
+            data_folder / "training.csv"
         )
 
         Training.query.delete()
@@ -344,37 +286,32 @@ def sync_from_csv(app):
             db.session.add(
                 Training(
                     title=row.get(
-                        "title",
-                        ""
+                        "title", ""
                     ).strip(),
 
                     description=row.get(
-                        "description",
-                        ""
+                        "description", ""
                     ).strip(),
 
                     department=row.get(
-                        "department",
-                        ""
+                        "department", ""
                     ).strip(),
 
                     duration=row.get(
-                        "duration",
-                        ""
+                        "duration", ""
                     ).strip(),
 
                     mandatory=mandatory,
 
                     url=row.get(
-                        "url",
-                        ""
+                        "url", ""
                     ).strip()
                 )
             )
 
 
         # =================================================
-        # SAVE
+        # COMMIT
         # =================================================
 
         db.session.commit()
@@ -394,14 +331,19 @@ def sync_from_csv(app):
 
         db.session.rollback()
 
-        db.session.add(
-            SyncLog(
-                source="CSV",
-                status="Failed",
-                message=str(e)
-            )
-        )
+        try:
 
-        db.session.commit()
+            db.session.add(
+                SyncLog(
+                    source="CSV",
+                    status="Failed",
+                    message=str(e)
+                )
+            )
+
+            db.session.commit()
+
+        except Exception:
+            db.session.rollback()
 
         raise
