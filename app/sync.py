@@ -2,6 +2,8 @@ from pathlib import Path
 from datetime import datetime
 import csv
 
+from flask import current_app
+
 from . import db
 from .models import (
     CommonURL,
@@ -24,20 +26,20 @@ def _read_csv(path):
         newline="",
         encoding="utf-8-sig"
     ) as f:
-
         return list(csv.DictReader(f))
 
 
-def sync_data_files(app):
+def sync_data_files():
     """
     Synchronize CSV data files with the database.
 
-    The function name is intentionally kept as
-    sync_data_files because app/__init__.py imports it.
+    This function intentionally takes no arguments because
+    app/__init__.py calls sync_data_files() directly while
+    the Flask application context is active.
     """
 
     data_folder = Path(
-        app.config["DATA_FOLDER"]
+        current_app.config["DATA_FOLDER"]
     )
 
     try:
@@ -74,7 +76,6 @@ def sync_data_files(app):
                     ).strip()
                 )
             )
-
 
         # =================================================
         # DEPARTMENTS
@@ -135,7 +136,6 @@ def sync_data_files(app):
                 )
             )
 
-
         # =================================================
         # HOLIDAYS
         # =================================================
@@ -152,14 +152,12 @@ def sync_data_files(app):
                 continue
 
             try:
-
                 holiday_date = datetime.strptime(
                     row["date"].strip(),
                     "%Y-%m-%d"
                 ).date()
 
             except ValueError:
-
                 continue
 
             db.session.add(
@@ -176,7 +174,6 @@ def sync_data_files(app):
                     ).strip()
                 )
             )
-
 
         # =================================================
         # AUDITS
@@ -197,14 +194,12 @@ def sync_data_files(app):
                 continue
 
             try:
-
                 audit_date = datetime.strptime(
                     row["audit_date"].strip(),
                     "%Y-%m-%d"
                 ).date()
 
             except ValueError:
-
                 continue
 
             next_audit_date = None
@@ -212,14 +207,12 @@ def sync_data_files(app):
             if row.get("next_audit_date"):
 
                 try:
-
                     next_audit_date = datetime.strptime(
                         row["next_audit_date"].strip(),
                         "%Y-%m-%d"
                     ).date()
 
                 except ValueError:
-
                     next_audit_date = None
 
             db.session.add(
@@ -250,7 +243,6 @@ def sync_data_files(app):
                     ).strip()
                 )
             )
-
 
         # =================================================
         # TRAINING
@@ -309,7 +301,6 @@ def sync_data_files(app):
                 )
             )
 
-
         # =================================================
         # COMMIT
         # =================================================
@@ -325,7 +316,6 @@ def sync_data_files(app):
         )
 
         db.session.commit()
-
 
     except Exception as e:
 
