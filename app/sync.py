@@ -1,94 +1,407 @@
-
 from pathlib import Path
-from datetime import datetime
 import csv
+
 from . import db
-from .models import Holiday, Department, CommonURL, Audit, Training
+from .models import (
+    CommonURL,
+    Department,
+    Holiday,
+    Audit,
+    Training,
+    SyncLog
+)
+
 
 def _read_csv(path):
-    with path.open("r", encoding="utf-8-sig", newline="") as f:
-        return list(csv.DictReader(f))
+    """
+    Read a CSV file and return its rows as dictionaries.
+    Returns an empty list if the file does not exist.
+    """
 
-def sync_data_files():
-    from flask import current_app
-    if current_app.config.get("_sync_running"):
-        return
-    current_app.config["_sync_running"] = True
+    if not path.exists():
+        return []
+
+    with path.open(
+        "r",
+        newline="",
+        encoding="utf-8-sig"
+    ) as f:
+
+        return list(
+            csv.DictReader(f)
+        )
+
+
+def sync_from_csv(app):
+    """
+    Synchronize static CSV data with the database.
+
+    Audits are treated carefully because department heads
+    can add audits directly through the application.
+    Those audits are already written back to audits.csv
+    by admin.py.
+    """
+
+    data_folder = Path(
+        app.config["DATA_FOLDER"]
+    )
+
     try:
-        data = Path(current_app.config["DATA_FOLDER"])
 
-        # Common URLs
-        p = data / "common_urls.csv"
-        if p.exists():
-            rows = _read_csv(p)
-            CommonURL.query.delete()
-            for r in rows:
-                if r.get("name") and r.get("url"):
-                    db.session.add(CommonURL(
-                        name=r["name"].strip(), description=r.get("description","").strip(),
-                        category=r.get("category","").strip(), department=r.get("department","").strip(),
-                        url=r["url"].strip()
-                    ))
+        # =================================================
+        # COMMON URLS
+        # =================================================
 
-        # Departments / department heads
-        p = data / "departments.csv"
-        if p.exists():
-            rows = _read_csv(p)
-            Department.query.delete()
-            for r in rows:
-                if r.get("name"):
-                    db.session.add(Department(
-                        name=r["name"].strip(), head_name=r.get("head_name","").strip(),
-                        designation=r.get("designation","").strip(), email=r.get("email","").strip(),
-                        phone=r.get("phone","").strip(), extension=r.get("extension","").strip(),
-                        office=r.get("office","").strip(), floor=r.get("floor","").strip(),
-                        room=r.get("room","").strip(), description=r.get("description","").strip()
-                    ))
+        common_urls_file = (
+            data_folder / "common_urls.csv"
+        )
 
-        # Holidays
-        p = data / "holidays.csv"
-        if p.exists():
-            rows = _read_csv(p)
-            Holiday.query.delete()
-            for r in rows:
-                if r.get("name") and r.get("date"):
-                    d = datetime.strptime(r["date"].strip(), "%Y-%m-%d").date()
-                    db.session.add(Holiday(name=r["name"].strip(), date=d,
-                                           holiday_type=r.get("holiday_type","Company").strip()))
+        rows = _read_csv(
+            common_urls_file
+        )
 
-        # Audits (ISO/GDP)
-        p = data / "audits.csv"
-        if p.exists():
-            rows = _read_csv(p)
-            Audit.query.delete()
-            for r in rows:
-                if r.get("name"):
-                    def dt(key):
-                        v = r.get(key,"").strip()
-                        return datetime.strptime(v, "%Y-%m-%d").date() if v else None
-                    db.session.add(Audit(
-                        name=r["name"].strip(), department=r.get("department","").strip(),
-                        audit_type=r.get("audit_type","").strip(), auditor=r.get("auditor","").strip(),
-                        audit_date=dt("audit_date"), next_audit_date=dt("next_audit_date"),
-                        status=r.get("status","Upcoming").strip()
-                    ))
+        CommonURL.query.delete()
 
-        # Training catalog
-        p = data / "training.csv"
-        if p.exists():
-            rows = _read_csv(p)
-            Training.query.delete()
-            for r in rows:
-                if r.get("title"):
-                    db.session.add(Training(
-                        title=r["title"].strip(), description=r.get("description","").strip(),
-                        department=r.get("department","").strip(), duration=r.get("duration","").strip(),
-                        mandatory=r.get("mandatory","No").strip().lower() in ("yes","true","1"),
-                        url=r.get("url","").strip()
-                    ))
+        for row in rows:
+
+            if not row.get("name") or not row.get("url"):
+                continue
+
+            db.session.add(
+                CommonURL(
+                    name=row.get("name", "").strip(),
+                    description=row.get(
+                        "description",
+                        ""
+                    ).strip(),
+                    category=row.get(
+                        "category",
+                        ""
+                    ).strip(),
+                    department=row.get(
+                        "department",
+                        ""
+                    ).strip(),
+                    url=row.get(
+                        "url",
+                        ""
+                    ).strip()
+                )
+            )
+
+
+        # =================================================
+        # DEPARTMENTS
+        # =================================================
+
+        departments_file = (
+            data_folder / "departments.csv"
+        )
+
+        rows = _read_csv(
+            departments_file
+        )
+
+        Department.query.delete()
+
+        for row in rows:
+
+            if not row.get("name"):
+                continue
+
+            db.session.add(
+                Department(
+                    name=row.get(
+                        "name",
+                        ""
+                    ).strip(),
+
+                    head_name=row.get(
+                        "head_name",
+                        ""
+                    ).strip(),
+
+                    designation=row.get(
+                        "designation",
+                        ""
+                    ).strip(),
+
+                    email=row.get(
+                        "email",
+                        ""
+                    ).strip(),
+
+                    phone=row.get(
+                        "phone",
+                        ""
+                    ).strip(),
+
+                    extension=row.get(
+                        "extension",
+                        ""
+                    ).strip(),
+
+                    office=row.get(
+                        "office",
+                        ""
+                    ).strip(),
+
+                    floor=row.get(
+                        "floor",
+                        ""
+                    ).strip(),
+
+                    room=row.get(
+                        "room",
+                        ""
+                    ).strip(),
+
+                    description=row.get(
+                        "description",
+                        ""
+                    ).strip()
+                )
+            )
+
+
+        # =================================================
+        # HOLIDAYS
+        # =================================================
+
+        holidays_file = (
+            data_folder / "holidays.csv"
+        )
+
+        rows = _read_csv(
+            holidays_file
+        )
+
+        Holiday.query.delete()
+
+        for row in rows:
+
+            if not row.get("name") or not row.get("date"):
+                continue
+
+            from datetime import datetime
+
+            try:
+
+                holiday_date = datetime.strptime(
+                    row["date"].strip(),
+                    "%Y-%m-%d"
+                ).date()
+
+            except ValueError:
+
+                continue
+
+            db.session.add(
+                Holiday(
+                    name=row.get(
+                        "name",
+                        ""
+                    ).strip(),
+
+                    date=holiday_date,
+
+                    holiday_type=row.get(
+                        "holiday_type",
+                        "Company"
+                    ).strip()
+                )
+            )
+
+
+        # =================================================
+        # AUDITS
+        # =================================================
+        #
+        # IMPORTANT:
+        # admin.py now writes newly created audits into
+        # audits.csv.
+        #
+        # Therefore it is safe for sync to rebuild the
+        # Audit table from the CSV.
+        #
+        # =================================================
+
+        audits_file = (
+            data_folder / "audits.csv"
+        )
+
+        rows = _read_csv(
+            audits_file
+        )
+
+        Audit.query.delete()
+
+        from datetime import datetime
+
+        for row in rows:
+
+            if (
+                not row.get("name")
+                or not row.get("audit_date")
+            ):
+                continue
+
+            try:
+
+                audit_date = datetime.strptime(
+                    row["audit_date"].strip(),
+                    "%Y-%m-%d"
+                ).date()
+
+            except ValueError:
+
+                continue
+
+            next_audit_date = None
+
+            if row.get("next_audit_date"):
+
+                try:
+
+                    next_audit_date = datetime.strptime(
+                        row["next_audit_date"].strip(),
+                        "%Y-%m-%d"
+                    ).date()
+
+                except ValueError:
+
+                    next_audit_date = None
+
+            db.session.add(
+                Audit(
+                    name=row.get(
+                        "name",
+                        ""
+                    ).strip(),
+
+                    department=row.get(
+                        "department",
+                        ""
+                    ).strip(),
+
+                    audit_type=row.get(
+                        "audit_type",
+                        ""
+                    ).strip(),
+
+                    auditor=row.get(
+                        "auditor",
+                        ""
+                    ).strip(),
+
+                    audit_date=audit_date,
+
+                    next_audit_date=next_audit_date,
+
+                    status=row.get(
+                        "status",
+                        "Upcoming"
+                    ).strip()
+                )
+            )
+
+
+        # =================================================
+        # TRAINING
+        # =================================================
+
+        training_file = (
+            data_folder / "training.csv"
+        )
+
+        rows = _read_csv(
+            training_file
+        )
+
+        Training.query.delete()
+
+        for row in rows:
+
+            if not row.get("title"):
+                continue
+
+            mandatory_value = (
+                row.get(
+                    "mandatory",
+                    ""
+                )
+                .strip()
+                .lower()
+            )
+
+            mandatory = mandatory_value in (
+                "yes",
+                "true",
+                "1",
+                "mandatory"
+            )
+
+            db.session.add(
+                Training(
+                    title=row.get(
+                        "title",
+                        ""
+                    ).strip(),
+
+                    description=row.get(
+                        "description",
+                        ""
+                    ).strip(),
+
+                    department=row.get(
+                        "department",
+                        ""
+                    ).strip(),
+
+                    duration=row.get(
+                        "duration",
+                        ""
+                    ).strip(),
+
+                    mandatory=mandatory,
+
+                    url=row.get(
+                        "url",
+                        ""
+                    ).strip()
+                )
+            )
+
+
+        # =================================================
+        # SAVE
+        # =================================================
+
         db.session.commit()
-    except Exception:
+
+        db.session.add(
+            SyncLog(
+                source="CSV",
+                status="Success",
+                message="CSV data synchronized successfully."
+            )
+        )
+
+        db.session.commit()
+
+
+    except Exception as e:
+
         db.session.rollback()
-        # Keep the previous database state if an editable file is malformed.
-    finally:
-        current_app.config["_sync_running"] = False
+
+        db.session.add(
+            SyncLog(
+                source="CSV",
+                status="Failed",
+                message=str(e)
+            )
+        )
+
+        db.session.commit()
+
+        raise
