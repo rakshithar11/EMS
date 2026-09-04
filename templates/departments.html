@@ -1,4 +1,99 @@
 {% extends "base.html" %}
+
 {% block title %}Interdepartmental Directory · EMS{% endblock %}
-{% block content %}<div class="between"><div><h1>Interdepartmental Directory</h1><p class="muted">Find department heads, contacts and office locations.</p></div><form><input name="q" value="{{q}}" placeholder="Search department or head"></form></div>
-<div class="grid three">{% for d in departments %}<section class="panel"><span class="eyebrow">{{d.name}}</span><h2>{{d.head_name}}</h2><p>{{d.designation}}</p><hr><p>✉ {{d.email or '—'}}</p><p>☎ {{d.phone or '—'}}{% if d.extension %} · Ext. {{d.extension}}{% endif %}</p><p>⌖ {{d.building or '—'}} · Floor {{d.floor or '—'}} · Room {{d.room or '—'}}</p>{% if d.description %}<small>{{d.description}}</small>{% endif %}</section>{% else %}<section class="panel">No departments found.</section>{% endfor %}</div>{% endblock %}
+
+{% block content %}
+
+<div class="between">
+
+    <div>
+        <h1>Interdepartmental Directory</h1>
+        <p class="muted">
+            Find department heads, contacts and office locations.
+        </p>
+    </div>
+
+    <form method="GET">
+        <input
+            name="q"
+            value="{{ q }}"
+            placeholder="Search department or head"
+        >
+    </form>
+
+</div>
+
+
+<div class="grid three">
+
+    {% for d in departments %}
+
+    <section class="panel">
+
+        <span class="eyebrow">
+            {{ d.name }}
+        </span>
+
+        <h2>
+            {{ d.head_name }}
+        </h2>
+
+        <p>
+            {{ d.designation }}
+        </p>
+
+        <hr>
+
+        {% if d.email %}
+        <p>
+            ✉ {{ d.email }}
+        </p>
+        {% endif %}
+
+        {% if d.phone %}
+        <p>
+            ☎ {{ d.phone }}
+
+            {% if d.extension %}
+            · Ext. {{ d.extension }}
+            {% endif %}
+        </p>
+        {% endif %}
+
+        <p>
+            ⌖ {{ d.office or '—' }}
+
+            {% if d.floor %}
+            · Floor {{ d.floor }}
+            {% endif %}
+
+            {% if d.room %}
+            · Room {{ d.room }}
+            {% endif %}
+        </p>
+
+        {% if d.description %}
+        <small>
+            {{ d.description }}
+        </small>
+        {% endif %}
+
+    </section>
+
+    {% else %}
+
+    <section class="panel">
+
+        <h2>No departments found</h2>
+
+        <p class="muted">
+            Try a different department or head name.
+        </p>
+
+    </section>
+
+    {% endfor %}
+
+</div>
+
+{% endblock %}
