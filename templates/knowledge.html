@@ -1,9 +1,154 @@
 {% extends "base.html" %}
+
 {% block title %}Knowledge & Compliance · EMS{% endblock %}
-{% block content %}<h1>Knowledge & Compliance</h1>
+
+{% block content %}
+
+<h1>Knowledge & Compliance</h1>
+
 <div class="grid two">
-<section class="panel"><h2>SOP Repository</h2>{% for x in sops %}<div class="list-row"><div><strong>{{x.name}}</strong><small>{{x.department}} · v{{x.version}}</small></div><span class="badge">Updated</span></div>{% else %}<p>No SOPs uploaded.</p>{% endfor %}</section>
-<section class="panel"><h2>Training Library</h2>{% for x in training %}<div class="list-row"><div><strong>{{x.title}}</strong><small>{{x.department}} · {{x.duration or '-'}}{% if x.mandatory %} · Mandatory{% endif %}</small></div>{% if x.url %}<a href="{{x.url}}" target="_blank">Open</a>{% endif %}</div>{% else %}<p>No training records.</p>{% endfor %}</section>
+
+    <section class="panel">
+
+        <h2>SOP Repository</h2>
+
+        {% for x in sops %}
+
+        <div class="list-row">
+
+            <div>
+                <strong>{{ x.name }}</strong>
+
+                <small>
+                    {{ x.department }}
+                    · v{{ x.version }}
+
+                    {% if x.code %}
+                    · {{ x.code }}
+                    {% endif %}
+                </small>
+            </div>
+
+            <div>
+                <span class="badge">Updated</span>
+
+                <a
+                    class="button"
+                    href="{{ url_for('main.open_sop', sop_id=x.id) }}"
+                    target="_blank"
+                >
+                    Open SOP ↗
+                </a>
+            </div>
+
+        </div>
+
+        {% else %}
+
+        <p>No SOPs uploaded.</p>
+
+        {% endfor %}
+
+    </section>
+
+
+    <section class="panel">
+
+        <h2>Training Library</h2>
+
+        {% for x in training %}
+
+        <div class="list-row">
+
+            <div>
+
+                <strong>{{ x.title }}</strong>
+
+                <small>
+                    {{ x.department }}
+                    · {{ x.duration or '-' }}
+
+                    {% if x.mandatory %}
+                    · Mandatory
+                    {% endif %}
+                </small>
+
+            </div>
+
+            {% if x.url %}
+
+            <a
+                class="button"
+                href="{{ x.url }}"
+                target="_blank"
+            >
+                Open ↗
+            </a>
+
+            {% endif %}
+
+        </div>
+
+        {% else %}
+
+        <p>No training records.</p>
+
+        {% endfor %}
+
+    </section>
+
 </div>
-<section class="panel"><h2>Audit Calendar</h2><table><tr><th>Audit</th><th>Department</th><th>Date</th><th>Status</th><th>Due date</th></tr>{% for x in audits %}<tr><td>{{x.name}}</td><td>{{x.department}}</td><td>{{x.audit_date}}</td><td><span class="badge">{{x.status}}</span></td><td>{{x.due_date or '-'}}</td></tr>{% else %}<tr><td colspan="5">No audits.</td></tr>{% endfor %}</table></section>
+
+
+<section class="panel">
+
+    <h2>Audit Calendar</h2>
+
+    <table>
+
+        <tr>
+            <th>Audit</th>
+            <th>Department</th>
+            <th>Type</th>
+            <th>Audit Date</th>
+            <th>Next Audit</th>
+            <th>Status</th>
+        </tr>
+
+        {% for x in audits %}
+
+        <tr>
+
+            <td>{{ x.name }}</td>
+
+            <td>{{ x.department }}</td>
+
+            <td>{{ x.audit_type }}</td>
+
+            <td>{{ x.audit_date or '-' }}</td>
+
+            <td>{{ x.next_audit_date or '-' }}</td>
+
+            <td>
+                <span class="badge">
+                    {{ x.status }}
+                </span>
+            </td>
+
+        </tr>
+
+        {% else %}
+
+        <tr>
+            <td colspan="6">
+                No audits.
+            </td>
+        </tr>
+
+        {% endfor %}
+
+    </table>
+
+</section>
+
 {% endblock %}
