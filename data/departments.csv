@@ -1,9 +1,11 @@
 name,head_name,designation,email,phone,extension,office,floor,room,description
-Admin,Mr. Vijay Kumar,Head - Admin,vijaykumar@bobbagroup.com,9980998584,,Corporate Office,,,Head information from supplied contact sheet
-Accounts,Not assigned,,,,,Corporate Office,,,Head information not present in supplied contact sheet
-HR,Mr. Chakrapani,Head - HR,chakrapani.rompicharla@bobbagroup.com,9448179993,,Corporate Office,,,Head information from supplied contact sheet
-Cold Storage (L2),Not assigned,,,,,L2,,,Head information not present in supplied contact sheet
-Dry Storage (L1),Not assigned,,,,,L1,,,Head information not present in supplied contact sheet
-Facilities,Mr. Jayatheertha,Head - Facilities,jayatheertha.g@bobbagroup.com,9606003071,,L1,,,Head information from supplied contact sheet
-Security,Mr. Midde Ganesh,Head - Security,midde.ganesh@bobbagroup.com,9606003073,,L1,,,Head information from supplied contact sheet
-IT,Mr. Bhanu Prakash,Head - IT,bl.itsupport@bobbagroup.com,9606003072,,L1,,,Head information from supplied contact sheet
+General Manager,Mr. Seshagiri,General Manager,corpadmin@bobbagroup.com,9972047304,,Corporate Office,,,Interdepartmental contact
+HR,Mr. Chakrapani,HR,chakrapani.rompicharla@bobbagroup.com,9448179993,,Corporate Office,,,Interdepartmental contact
+Admin,Mr. Vijay Kumar,Admin,vijaykumar@bobbagroup.com,9980998584,,Corporate Office,,,Interdepartmental contact
+Operation,Mr. Vijay Rozario,Operation,vijay.rozario@bobbagroup.com,9980419017,,L1,,,Interdepartmental contact
+Facility,Mr. Jayatheertha,Facility,jayatheertha.g@bobbagroup.com,9606003071,,L1,,,Interdepartmental contact
+IT,Mr. Bhanu Prakash,IT,bl.itsupport@bobbagroup.com,9606003072,,L1,,,Interdepartmental contact
+Customer Service,Mrs. Manjula,Customer Service,manjula.gardampalli@bobbagroup.com,8867894561,,L1,,,Interdepartmental contact
+Sales & Marketing,Ms. Likhitha,Sales & Marketing,likhitha.sheregar@bobbagroup.com,7349065779,,Corporate Office,,,Interdepartmental contact
+Safety & Security,Mr. Midde Ganesh,Safety & Security,midde.ganesh@bobbagroup.com,9606003073,,L1,,,Interdepartmental contact
+Quality Control,Mr. Praveen CN,Quality Control,praveen.cn@bobbagroup.com,9739137319,,L1,,,Interdepartmental contact
