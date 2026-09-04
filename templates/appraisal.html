@@ -1,0 +1,7 @@
+
+{% extends "base.html" %}
+{% block title %}My Appraisal · EMS{% endblock %}
+{% block content %}<h1>My Appraisal</h1>
+{% for x in rows %}<section class="panel"><div class="between"><div><h2>{{x.cycle}}</h2><p>Raised by {{x.raised_by}}</p></div><strong>{{x.completion}}%</strong></div>
+<div class="progress"><span style="width:{{x.completion}}%"></span></div><p class="muted">Current stage: {{x.stage}}{% if x.next_date %} · Review date: {{x.next_date}}{% endif %}</p></section>
+{% else %}<section class="panel"><h2>No appraisal raised yet</h2><p class="muted">Your department head will raise your appraisal when the cycle begins.</p></section>{% endfor %}{% endblock %}

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Login · EMS{% endblock %}
+
+{% block auth_content %}
+
+<div class="login">
+
+    <div class="login-card">
+
+        <div class="brand">
+            EMS<span>.</span>
+        </div>
+
+        <h1>Employee Management System</h1>
+
+        <p>Sign in to access your employee portal.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="alert {{ category }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endwith %}
+
+        <form method="post">
+
+            <input
+                name="email"
+                type="email"
+                placeholder="Official email"
+                required
+            >
+
+            <input
+                name="password"
+                type="password"
+                placeholder="Password"
+                required
+            >
+
+            <button type="submit">
+                Sign in
+            </button>
+
+        </form>
+
+        <small>
+            Demo employee:
+            employee@company.com / employee123
+        </small>
+
+        <br>
+
+        <small>
+            Department heads:
+            official email / welcome123
+        </small>
+
+    </div>
+
+</div>
+
+{% endblock %}

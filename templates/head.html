@@ -1,0 +1,64 @@
+
+{% extends "base.html" %}
+{% block title %}Department Head · EMS{% endblock %}
+{% block content %}
+<h1>Department Head Console</h1>
+<p class="muted">{{ current_user.department }} · {{ current_user.name }}</p>
+
+<div class="grid cards">
+<div class="card"><span>Pending leave requests</span><strong>{{ pending|length }}</strong></div>
+<div class="card"><span>Department employees</span><strong>{{ employees|length }}</strong></div>
+<div class="card"><span>SOPs</span><strong>{{ sops|length }}</strong></div>
+<div class="card"><span>Audits</span><strong>{{ audits|length }}</strong></div>
+</div>
+
+<section class="panel">
+<h2>Leave / Holiday Approval</h2>
+{% for x in pending %}
+<div class="approval">
+<div><strong>{{x.employee_id}}</strong> · {{x.leave_type}}<p>{{x.start_date}} → {{x.end_date}} · {{x.days}} day(s)</p><small>{{x.reason or 'No reason given'}}</small></div>
+<form method="post" action="{{url_for('head.leave_action', id=x.id, action='approve')}}"><input name="comment" placeholder="Optional comment"><button>Approve</button></form>
+<form method="post" action="{{url_for('head.leave_action', id=x.id, action='reject')}}"><input name="comment" placeholder="Reason"><button class="danger">Reject</button></form>
+</div>
+{% else %}<p>No pending requests for your department.</p>{% endfor %}
+</section>
+
+<div class="grid two">
+<section class="panel">
+<h2>Upload SOP</h2>
+<form class="form-grid one" method="post" enctype="multipart/form-data" action="{{url_for('head.upload_sop')}}">
+<input name="file" type="file" required><input name="code" placeholder="SOP code"><input name="version" placeholder="Version e.g. 2.0"><button>Upload SOP</button>
+</form>
+</section>
+
+<section class="panel">
+<h2>Add Audit Date</h2>
+<form class="form-grid one" method="post" action="{{url_for('head.add_audit')}}">
+<input name="name" placeholder="Audit name" required><select name="audit_type"><option>ISO</option><option>GDP</option></select>
+<input name="audit_date" type="date" required><input name="next_audit_date" type="date"><input name="auditor" placeholder="Auditor"><button>Add audit</button>
+</form>
+</section>
+
+<section class="panel">
+<h2>Add Holiday</h2>
+<form class="form-grid one" method="post" action="{{url_for('head.add_holiday')}}">
+<input name="name" placeholder="Holiday name" required><input name="date" type="date" required><select name="holiday_type"><option>Company</option><option>Public</option><option>Optional</option></select><button>Add holiday</button>
+</form>
+</section>
+
+<section class="panel">
+<h2>Raise Appraisal</h2>
+<form class="form-grid one" method="post" action="{{url_for('head.raise_appraisal')}}">
+<select name="employee_id" required><option value="">Select employee</option>{% for e in employees %}<option value="{{e.id}}">{{e.name}} · {{e.employee_id}}</option>{% endfor %}</select>
+<input name="cycle" placeholder="Appraisal cycle e.g. 2026-27" required><input name="next_date" type="date"><button>Raise appraisal</button>
+</form>
+</section>
+</div>
+
+<section class="panel">
+<h2>Department Audits</h2>
+<table><tr><th>Audit</th><th>Type</th><th>Date</th><th>Next date</th><th>Status</th></tr>
+{% for a in audits %}<tr><td>{{a.name}}</td><td>{{a.audit_type}}</td><td>{{a.audit_date}}</td><td>{{a.next_audit_date or '-'}}</td><td><span class="badge">{{a.status}}</span></td></tr>{% else %}<tr><td colspan="5">No audits yet.</td></tr>{% endfor %}
+</table>
+</section>
+{% endblock %}

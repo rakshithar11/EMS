@@ -1,0 +1,19 @@
+
+{% extends "base.html" %}
+{% block title %}Dashboard · EMS{% endblock %}
+{% block content %}
+<div class="between"><div><h1>Employee Dashboard</h1><p class="muted">{{current_user.name}} · {{current_user.department}}</p></div>
+{% if today_att and today_att.check_in and not today_att.check_out %}<span class="badge">Attendance logged today</span>{% endif %}</div>
+<div class="grid cards">
+<div class="card"><span>Total leave remaining</span><strong>{{total_remaining}}</strong><small>of 16 days</small></div>
+<div class="card"><span>Paid leave remaining</span><strong>{{paid_remaining}}</strong><small>of 8 paid days</small></div>
+<div class="card"><span>Today's attendance</span><strong>{% if today_att and today_att.check_in %}IN{% else %}—{% endif %}</strong><small>{% if today_att and today_att.check_in %}{{today_att.check_in.strftime('%I:%M %p')}}{% else %}Not logged{% endif %}</small></div>
+<div class="card"><span>Appraisal</span><strong>{{appraisal.completion if appraisal else 0}}%</strong><small>{{appraisal.stage if appraisal else 'Not raised'}}</small></div>
+</div>
+<div class="grid two">
+<section class="panel"><h2>Quick attendance</h2><p class="muted">There is no work-from-home option in this system.</p>
+<a class="button" href="{{url_for('main.attendance')}}">Open attendance</a></section>
+<section class="panel"><h2>Leave request</h2><p>{{total_remaining}} total days remain, including {{paid_remaining}} paid days.</p><a class="button" href="{{url_for('main.leave')}}">Raise holiday request</a></section>
+</div>
+<section class="panel"><h2>Upcoming holidays</h2>{% for h in holidays %}<div class="list-row"><div><strong>{{h.name}}</strong><small>{{h.holiday_type}}</small></div><strong>{{h.date}}</strong></div>{% else %}<p>No holidays listed.</p>{% endfor %}</section>
+{% endblock %}

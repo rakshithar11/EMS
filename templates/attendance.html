@@ -1,0 +1,17 @@
+
+{% extends "base.html" %}
+{% block title %}Attendance · EMS{% endblock %}
+{% block content %}
+<h1>Attendance</h1>
+<section class="panel">
+<h2>Today's attendance</h2>
+<div class="attendance-actions">
+{% if not today_record or not today_record.check_in %}<form method="post"><input type="hidden" name="action" value="checkin"><button>Log Check-in</button></form>
+{% else %}<p><strong>Checked in:</strong> {{today_record.check_in.strftime('%I:%M %p')}}</p>{% endif %}
+{% if today_record and today_record.check_in and not today_record.check_out %}<form method="post"><input type="hidden" name="action" value="checkout"><button>Log Check-out</button></form>
+{% elif today_record and today_record.check_out %}<p><strong>Checked out:</strong> {{today_record.check_out.strftime('%I:%M %p')}} · {{today_record.hours}} hrs</p>{% endif %}
+</div>
+</section>
+<section class="panel"><h2>Attendance history</h2><table><tr><th>Date</th><th>Status</th><th>Check-in</th><th>Check-out</th><th>Hours</th></tr>
+{% for x in rows %}<tr><td>{{x.date}}</td><td>{{x.status}}</td><td>{{x.check_in.strftime('%I:%M %p') if x.check_in else '-'}}</td><td>{{x.check_out.strftime('%I:%M %p') if x.check_out else '-'}}</td><td>{{x.hours}}</td></tr>{% else %}<tr><td colspan="5">No attendance logged yet.</td></tr>{% endfor %}</table></section>
+{% endblock %}

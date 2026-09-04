@@ -1,0 +1,4 @@
+{% extends "base.html" %}
+{% block title %}Common Resources · EMS{% endblock %}
+{% block content %}<div class="between"><div><h1>Common Resources</h1><p class="muted">Central list of frequently used links.</p></div><form><input name="q" value="{{q}}" placeholder="Search resources"></form></div>
+<div class="grid three">{% for r in resources %}<section class="panel"><span class="eyebrow">{{r.category or 'General'}}</span><h2>{{r.name}}</h2><p>{{r.description}}</p><small>{{r.department or 'All departments'}}</small><br><a class="button" href="{{r.url}}" target="_blank">Open resource ↗</a></section>{% else %}<section class="panel">No resources found.</section>{% endfor %}</div>{% endblock %}

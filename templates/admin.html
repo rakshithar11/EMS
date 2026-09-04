@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Admin · EMS{% endblock %}
+{% block content %}<h1>Admin Console</h1>
+<div class="grid cards"><div class="card"><span>Employees</span><strong>{{employees}}</strong></div><div class="card"><span>Pending leave</span><strong>{{pending}}</strong></div><div class="card"><span>SOPs</span><strong>{{sops}}</strong></div><div class="card"><span>Audits</span><strong>{{audits}}</strong></div><div class="card"><span>Departments</span><strong>{{departments}}</strong></div><div class="card"><span>Resources</span><strong>{{urls}}</strong></div></div>
+<section class="panel"><h2>Leave Approval Center</h2>{% for x in __import__('app.models', fromlist=['LeaveRequest']).LeaveRequest.query.filter_by(status='Pending').order_by(__import__('app.models', fromlist=['LeaveRequest']).LeaveRequest.created_at.desc()).all() %}<div class="approval"><div><strong>{{x.employee_id}}</strong><p>{{x.leave_type}} · {{x.start_date}} → {{x.end_date}} · {{x.days}} day(s)</p><small>{{x.reason}}</small></div><form method="post" action="{{url_for('admin.leave_action', id=x.id, action='approve')}}"><input name="comment" placeholder="Comment"><button>Approve</button></form><form method="post" action="{{url_for('admin.leave_action', id=x.id, action='reject')}}"><input name="comment" placeholder="Reason"><button class="danger">Reject</button></form></div>{% else %}<p>No pending requests.</p>{% endfor %}</section>
+<section class="panel"><h2>Upload SOP</h2><form class="form-grid" method="post" enctype="multipart/form-data" action="{{url_for('admin.upload_sop')}}"><input name="file" type="file" required><input name="department" placeholder="Department"><input name="version" placeholder="Version"><button>Upload</button></form></section>
+<section class="panel"><h2>Data Source / File Sync</h2><p class="muted">Upload a replacement file; the website will rebuild that section from the latest valid file.</p>
+<form class="form-grid" method="post" enctype="multipart/form-data" action="{{url_for('admin.sync')}}"><select name="source"><option value="common_urls">Common URLs</option><option value="departments">Departments</option><option value="holidays">Holidays</option></select><input type="file" name="file" accept=".csv,.xlsx" required><button>Sync now</button></form>
+<p><strong>Common URLs CSV headers:</strong> name, description, category, department, url</p>
+<p><strong>Departments XLSX headers:</strong> name, head_name, designation, email, phone, extension, building, floor, room, description</p>
+<p><strong>Holidays XLSX headers:</strong> name, date, holiday_type</p>
+</section>
+<section class="panel"><h2>Recent synchronization</h2><table><tr><th>Source</th><th>Status</th><th>Message</th><th>Time</th></tr>{% for l in logs %}<tr><td>{{l.source}}</td><td>{{l.status}}</td><td>{{l.message}}</td><td>{{l.synced_at}}</td></tr>{% else %}<tr><td colspan="4">No sync logs.</td></tr>{% endfor %}</table></section>
+{% endblock %}

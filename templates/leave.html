@@ -1,0 +1,17 @@
+
+{% extends "base.html" %}
+{% block title %}Leave & Holidays · EMS{% endblock %}
+{% block content %}
+<h1>Holiday / Leave Requests</h1>
+<div class="grid cards"><div class="card"><span>Total remaining</span><strong>{{total_remaining}}</strong><small>maximum 16</small></div><div class="card"><span>Paid remaining</span><strong>{{paid_remaining}}</strong><small>maximum 8 paid</small></div></div>
+<section class="panel"><h2>Raise a holiday request</h2>
+<form class="form-grid" method="post">
+<select name="leave_type"><option>Paid</option><option>Unpaid</option></select>
+<input name="start_date" type="date" required><input name="end_date" type="date" required>
+<input name="reason" placeholder="Reason" required><button>Submit request</button>
+</form>
+<p class="muted">Work from home is not available. Requests go to the head of your department for approval.</p>
+</section>
+<section class="panel"><h2>My requests</h2><table><tr><th>Type</th><th>Dates</th><th>Days</th><th>Status</th><th>Comment</th></tr>
+{% for x in requests %}<tr><td>{{x.leave_type}}</td><td>{{x.start_date}} → {{x.end_date}}</td><td>{{x.days}}</td><td><span class="badge">{{x.status}}</span></td><td>{{x.head_comment or '-'}}</td></tr>{% else %}<tr><td colspan="5">No requests yet.</td></tr>{% endfor %}</table></section>
+{% endblock %}

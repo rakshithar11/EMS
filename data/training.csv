@@ -1,0 +1,4 @@
+title,description,department,duration,mandatory,url
+Employee Induction,New employee induction,HR,30 min,Yes,https://example.com/training/induction
+GDP Basics,GDP awareness training,Cold Storage (L2),45 min,Yes,https://example.com/training/gdp
+Safety Induction,Safety and security basics,Security,25 min,Yes,https://example.com/training/safety
