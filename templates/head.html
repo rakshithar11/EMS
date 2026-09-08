@@ -10,7 +10,7 @@
         <h1>Department Head Dashboard</h1>
 
         <p class="muted">
-            Manage leave requests, SOPs, audits, holidays and appraisals.
+            Manage leave requests, SOPs, training, audits, holidays and appraisals.
         </p>
     </div>
 
@@ -371,6 +371,7 @@
                 <input
                     type="file"
                     name="file"
+                    accept=".pdf"
                     required
                 >
 
@@ -469,6 +470,263 @@
 
 
 <!-- =====================================================
+     TRAINING LIBRARY
+     ===================================================== -->
+
+<section class="panel">
+
+    <div class="between">
+
+        <div>
+            <h2>Training Library</h2>
+
+            <p class="muted">
+                Upload training PDFs and videos for employees.
+            </p>
+        </div>
+
+    </div>
+
+
+    <!-- =================================================
+         TRAINING UPLOAD
+         ================================================= -->
+
+    <form
+        method="POST"
+        action="{{ url_for('head.upload_training') }}"
+        enctype="multipart/form-data"
+    >
+
+        <div class="form-grid">
+
+            <div>
+
+                <label>
+                    Training Title
+                </label>
+
+                <input
+                    type="text"
+                    name="title"
+                    placeholder="e.g. Fire Safety Training"
+                    required
+                >
+
+            </div>
+
+
+            {% if current_user.role == "admin" %}
+
+            <div>
+
+                <label>
+                    Department
+                </label>
+
+                <select
+                    name="department"
+                >
+
+                    <option value="">
+                        General Management / All Departments
+                    </option>
+
+                    <option value="Admin">
+                        Admin
+                    </option>
+
+                    <option value="Accounts">
+                        Accounts
+                    </option>
+
+                    <option value="HR">
+                        HR
+                    </option>
+
+                    <option value="Cold Storage (L2)">
+                        Cold Storage (L2)
+                    </option>
+
+                    <option value="Dry Storage (L1)">
+                        Dry Storage (L1)
+                    </option>
+
+                    <option value="Facilities">
+                        Facilities
+                    </option>
+
+                    <option value="Security">
+                        Security
+                    </option>
+
+                    <option value="IT">
+                        IT
+                    </option>
+
+                    <option value="Operation">
+                        Operation
+                    </option>
+
+                    <option value="Sales & Marketing">
+                        Sales & Marketing
+                    </option>
+
+                    <option value="Quality Control">
+                        Quality Control
+                    </option>
+
+                </select>
+
+            </div>
+
+            {% endif %}
+
+
+            <div>
+
+                <label>
+                    Training File
+                </label>
+
+                <input
+                    type="file"
+                    name="file"
+                    accept=".pdf,.mp4,.webm,.ogg,.mov,.avi,.mkv"
+                    required
+                >
+
+                <small class="muted">
+                    PDF or video file.
+                </small>
+
+            </div>
+
+        </div>
+
+
+        <div style="margin-top: 16px;">
+
+            <label>
+                Description
+            </label>
+
+            <textarea
+                name="description"
+                rows="3"
+                placeholder="Brief description of the training material."
+            ></textarea>
+
+        </div>
+
+
+        <div style="margin-top: 16px;">
+
+            <button
+                type="submit"
+                class="button"
+            >
+                Upload Training
+            </button>
+
+        </div>
+
+    </form>
+
+
+    <hr>
+
+
+    <!-- =================================================
+         TRAINING MATERIAL LIST
+         ================================================= -->
+
+    {% for training in trainings %}
+
+    <div class="list-row">
+
+        <div>
+
+            <strong>
+                {{ training.title }}
+            </strong>
+
+            <small>
+
+                {% if training.department %}
+                    {{ training.department }}
+                {% else %}
+                    All Departments
+                {% endif %}
+
+                {% if training.uploaded_by %}
+                    · Uploaded by {{ training.uploaded_by }}
+                {% endif %}
+
+                {% if training.uploaded_at %}
+                    · {{ training.uploaded_at.strftime('%d %b %Y') }}
+                {% endif %}
+
+            </small>
+
+            {% if training.description %}
+
+            <small>
+                {{ training.description }}
+            </small>
+
+            {% endif %}
+
+        </div>
+
+
+        {% if training.filename %}
+
+        <a
+            class="button"
+            href="{{ url_for('main.open_training', training_id=training.id) }}"
+            target="_blank"
+        >
+
+            {% set extension = training.filename.rsplit('.', 1)[-1].lower() if '.' in training.filename else '' %}
+
+            {% if extension == 'pdf' %}
+                Open PDF ↗
+            {% elif extension in ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'] %}
+                Play Video ↗
+            {% else %}
+                Open File ↗
+            {% endif %}
+
+        </a>
+
+        {% elif training.url %}
+
+        <a
+            class="button"
+            href="{{ training.url }}"
+            target="_blank"
+            rel="noopener noreferrer"
+        >
+            Open Training ↗
+        </a>
+
+        {% endif %}
+
+    </div>
+
+    {% else %}
+
+    <p class="muted">
+        No training materials have been uploaded yet.
+    </p>
+
+    {% endfor %}
+
+</section>
+
+
+<!-- =====================================================
      AUDIT MANAGEMENT
      ===================================================== -->
 
@@ -530,6 +788,73 @@
                 </select>
 
             </div>
+
+
+            {% if current_user.role == "admin" %}
+
+            <div>
+
+                <label>
+                    Department
+                </label>
+
+                <select
+                    name="department"
+                >
+
+                    <option value="">
+                        Select Department
+                    </option>
+
+                    <option value="Admin">
+                        Admin
+                    </option>
+
+                    <option value="Accounts">
+                        Accounts
+                    </option>
+
+                    <option value="HR">
+                        HR
+                    </option>
+
+                    <option value="Cold Storage (L2)">
+                        Cold Storage (L2)
+                    </option>
+
+                    <option value="Dry Storage (L1)">
+                        Dry Storage (L1)
+                    </option>
+
+                    <option value="Facilities">
+                        Facilities
+                    </option>
+
+                    <option value="Security">
+                        Security
+                    </option>
+
+                    <option value="IT">
+                        IT
+                    </option>
+
+                    <option value="Operation">
+                        Operation
+                    </option>
+
+                    <option value="Sales & Marketing">
+                        Sales & Marketing
+                    </option>
+
+                    <option value="Quality Control">
+                        Quality Control
+                    </option>
+
+                </select>
+
+            </div>
+
+            {% endif %}
 
 
             <div>
@@ -609,12 +934,19 @@
 
                 {{ audit.audit_type }}
 
+                · {{ audit.department }}
+
                 · Audit:
                 {{ audit.audit_date }}
 
                 {% if audit.next_audit_date %}
                 · Next:
                 {{ audit.next_audit_date }}
+                {% endif %}
+
+                {% if audit.auditor %}
+                · Auditor:
+                {{ audit.auditor }}
                 {% endif %}
 
             </small>
