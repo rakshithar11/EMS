@@ -1,17 +1,358 @@
-
 {% extends "base.html" %}
-{% block title %}Leave & Holidays · EMS{% endblock %}
+
+{% block title %}Holiday / Leave · EMS{% endblock %}
+
 {% block content %}
-<h1>Holiday / Leave Requests</h1>
-<div class="grid cards"><div class="card"><span>Total remaining</span><strong>{{total_remaining}}</strong><small>maximum 16</small></div><div class="card"><span>Paid remaining</span><strong>{{paid_remaining}}</strong><small>maximum 8 paid</small></div></div>
-<section class="panel"><h2>Raise a holiday request</h2>
-<form class="form-grid" method="post">
-<select name="leave_type"><option>Paid</option><option>Unpaid</option></select>
-<input name="start_date" type="date" required><input name="end_date" type="date" required>
-<input name="reason" placeholder="Reason" required><button>Submit request</button>
-</form>
-<p class="muted">Work from home is not available. Requests go to the head of your department for approval.</p>
+
+<div class="between">
+
+    <div>
+        <h1>Holiday / Leave Request</h1>
+
+        <p class="muted">
+            Submit a holiday or leave request and forward it
+            to the appropriate department head for approval.
+        </p>
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     LEAVE BALANCE
+     ===================================================== -->
+
+<div class="cards">
+
+    <div class="card">
+        <span class="eyebrow">Total Leave</span>
+
+        <strong>
+            {{ total_remaining }}
+        </strong>
+
+        <small>
+            days remaining
+        </small>
+    </div>
+
+
+    <div class="card">
+        <span class="eyebrow">Paid Leave</span>
+
+        <strong>
+            {{ paid_remaining }}
+        </strong>
+
+        <small>
+            paid days remaining
+        </small>
+    </div>
+
+
+    <div class="card">
+        <span class="eyebrow">Unpaid Leave</span>
+
+        <strong>
+            {{ total_remaining - paid_remaining }}
+        </strong>
+
+        <small>
+            remaining total balance after paid allocation
+        </small>
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     REQUEST FORM
+     ===================================================== -->
+
+<section class="panel">
+
+    <h2>Raise a Request</h2>
+
+    <form
+        method="POST"
+        action="{{ url_for('main.leave') }}"
+    >
+
+        <div class="form-grid">
+
+
+            <!-- LEAVE TYPE -->
+
+            <div>
+
+                <label for="leave_type">
+                    Leave Type
+                </label>
+
+                <select
+                    id="leave_type"
+                    name="leave_type"
+                    required
+                >
+
+                    <option value="">
+                        Select leave type
+                    </option>
+
+                    <option value="Paid">
+                        Paid Leave
+                    </option>
+
+                    <option value="Unpaid">
+                        Unpaid Leave
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <!-- START DATE -->
+
+            <div>
+
+                <label for="start_date">
+                    Start Date
+                </label>
+
+                <input
+                    type="date"
+                    id="start_date"
+                    name="start_date"
+                    required
+                >
+
+            </div>
+
+
+            <!-- END DATE -->
+
+            <div>
+
+                <label for="end_date">
+                    End Date
+                </label>
+
+                <input
+                    type="date"
+                    id="end_date"
+                    name="end_date"
+                    required
+                >
+
+            </div>
+
+
+            <!-- FORWARD TO -->
+
+            <div>
+
+                <label for="forward_to">
+                    Forward Request To
+                </label>
+
+                <select
+                    id="forward_to"
+                    name="forward_to"
+                    required
+                >
+
+                    <option value="">
+                        Select Department Head
+                    </option>
+
+                    {% for head in department_heads %}
+
+                    <option value="{{ head.email }}">
+
+                        {{ head.name }}
+
+                        {% if head.department %}
+                        — {{ head.department }}
+                        {% endif %}
+
+                    </option>
+
+                    {% endfor %}
+
+                </select>
+
+                <small class="muted">
+                    Select the department head who should
+                    receive and approve this request.
+                </small>
+
+            </div>
+
+
+            <!-- REASON -->
+
+            <div style="grid-column: 1 / -1;">
+
+                <label for="reason">
+                    Reason
+                </label>
+
+                <textarea
+                    id="reason"
+                    name="reason"
+                    rows="4"
+                    placeholder="Enter the reason for your leave request"
+                ></textarea>
+
+            </div>
+
+
+        </div>
+
+
+        <div style="margin-top: 20px;">
+
+            <button
+                type="submit"
+                class="button"
+            >
+                Submit Holiday / Leave Request
+            </button>
+
+        </div>
+
+    </form>
+
 </section>
-<section class="panel"><h2>My requests</h2><table><tr><th>Type</th><th>Dates</th><th>Days</th><th>Status</th><th>Comment</th></tr>
-{% for x in requests %}<tr><td>{{x.leave_type}}</td><td>{{x.start_date}} → {{x.end_date}}</td><td>{{x.days}}</td><td><span class="badge">{{x.status}}</span></td><td>{{x.head_comment or '-'}}</td></tr>{% else %}<tr><td colspan="5">No requests yet.</td></tr>{% endfor %}</table></section>
+
+
+<!-- =====================================================
+     REQUEST HISTORY
+     ===================================================== -->
+
+<section class="panel">
+
+    <div class="between">
+
+        <div>
+            <h2>My Holiday / Leave Requests</h2>
+
+            <p class="muted">
+                Track the status of requests you have submitted.
+            </p>
+        </div>
+
+    </div>
+
+
+    <table>
+
+        <thead>
+
+            <tr>
+
+                <th>Type</th>
+
+                <th>From</th>
+
+                <th>To</th>
+
+                <th>Days</th>
+
+                <th>Forwarded To</th>
+
+                <th>Status</th>
+
+                <th>Comment</th>
+
+            </tr>
+
+        </thead>
+
+
+        <tbody>
+
+            {% for request in requests %}
+
+            <tr>
+
+                <td>
+                    {{ request.leave_type }}
+                </td>
+
+
+                <td>
+                    {{ request.start_date }}
+                </td>
+
+
+                <td>
+                    {{ request.end_date }}
+                </td>
+
+
+                <td>
+                    {{ request.days }}
+                </td>
+
+
+                <td>
+
+                    {% if request.forwarded_to_name %}
+
+                        {{ request.forwarded_to_name }}
+
+                        {% if request.forwarded_to %}
+                        <br>
+                        <small>
+                            {{ request.forwarded_to }}
+                        </small>
+                        {% endif %}
+
+                    {% else %}
+
+                        —
+
+                    {% endif %}
+
+                </td>
+
+
+                <td>
+
+                    <span class="badge">
+                        {{ request.status }}
+                    </span>
+
+                </td>
+
+
+                <td>
+                    {{ request.head_comment or "—" }}
+                </td>
+
+            </tr>
+
+
+            {% else %}
+
+            <tr>
+
+                <td colspan="7">
+
+                    No holiday or leave requests yet.
+
+                </td>
+
+            </tr>
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</section>
+
 {% endblock %}
