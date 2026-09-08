@@ -1,64 +1,809 @@
-
 {% extends "base.html" %}
-{% block title %}Department Head · EMS{% endblock %}
+
+{% block title %}Department Head Dashboard · EMS{% endblock %}
+
 {% block content %}
-<h1>Department Head Console</h1>
-<p class="muted">{{ current_user.department }} · {{ current_user.name }}</p>
 
-<div class="grid cards">
-<div class="card"><span>Pending leave requests</span><strong>{{ pending|length }}</strong></div>
-<div class="card"><span>Department employees</span><strong>{{ employees|length }}</strong></div>
-<div class="card"><span>SOPs</span><strong>{{ sops|length }}</strong></div>
-<div class="card"><span>Audits</span><strong>{{ audits|length }}</strong></div>
+<div class="between">
+
+    <div>
+        <h1>Department Head Dashboard</h1>
+
+        <p class="muted">
+            Manage leave requests, SOPs, audits, holidays and appraisals.
+        </p>
+    </div>
+
 </div>
 
-<section class="panel">
-<h2>Leave / Holiday Approval</h2>
-{% for x in pending %}
-<div class="approval">
-<div><strong>{{x.employee_id}}</strong> · {{x.leave_type}}<p>{{x.start_date}} → {{x.end_date}} · {{x.days}} day(s)</p><small>{{x.reason or 'No reason given'}}</small></div>
-<form method="post" action="{{url_for('head.leave_action', id=x.id, action='approve')}}"><input name="comment" placeholder="Optional comment"><button>Approve</button></form>
-<form method="post" action="{{url_for('head.leave_action', id=x.id, action='reject')}}"><input name="comment" placeholder="Reason"><button class="danger">Reject</button></form>
-</div>
-{% else %}<p>No pending requests for your department.</p>{% endfor %}
-</section>
 
-<div class="grid two">
-<section class="panel">
-<h2>Upload SOP</h2>
-<form class="form-grid one" method="post" enctype="multipart/form-data" action="{{url_for('head.upload_sop')}}">
-<input name="file" type="file" required><input name="code" placeholder="SOP code"><input name="version" placeholder="Version e.g. 2.0"><button>Upload SOP</button>
-</form>
-</section>
+<!-- =====================================================
+     PENDING LEAVE REQUESTS
+     ===================================================== -->
 
 <section class="panel">
-<h2>Add Audit Date</h2>
-<form class="form-grid one" method="post" action="{{url_for('head.add_audit')}}">
-<input name="name" placeholder="Audit name" required><select name="audit_type"><option>ISO</option><option>GDP</option></select>
-<input name="audit_date" type="date" required><input name="next_audit_date" type="date"><input name="auditor" placeholder="Auditor"><button>Add audit</button>
-</form>
+
+    <div class="between">
+
+        <div>
+            <h2>Holiday / Leave Requests</h2>
+
+            <p class="muted">
+                Requests forwarded to you for approval.
+            </p>
+        </div>
+
+        <span class="badge">
+            {{ pending|length }} Pending
+        </span>
+
+    </div>
+
+
+    {% for req in pending %}
+
+    <div class="approval">
+
+        <div>
+
+            <strong>
+                {{ req.employee_id }}
+            </strong>
+
+            <p>
+                {{ req.leave_type }}
+                · {{ req.days }} day(s)
+                · {{ req.start_date }}
+                to
+                {{ req.end_date }}
+            </p>
+
+            {% if req.reason %}
+
+            <p>
+                <strong>Reason:</strong>
+                {{ req.reason }}
+            </p>
+
+            {% endif %}
+
+            <small class="muted">
+
+                Requested on
+                {{ req.created_at.strftime('%d %b %Y, %I:%M %p') }}
+
+                {% if req.forwarded_to_name %}
+                · Forwarded to {{ req.forwarded_to_name }}
+                {% endif %}
+
+            </small>
+
+        </div>
+
+
+        <form
+            method="POST"
+            action="{{ url_for('head.leave_action', id=req.id, action='approve') }}"
+        >
+
+            <div>
+
+                <input
+                    type="text"
+                    name="comment"
+                    placeholder="Comment (optional)"
+                >
+
+            </div>
+
+            <div style="margin-top: 8px;">
+
+                <button
+                    type="submit"
+                    class="button"
+                >
+                    Approve
+                </button>
+
+            </div>
+
+        </form>
+
+
+        <form
+            method="POST"
+            action="{{ url_for('head.leave_action', id=req.id, action='reject') }}"
+        >
+
+            <input
+                type="hidden"
+                name="comment"
+                value=""
+            >
+
+            <button
+                type="submit"
+                class="button secondary"
+            >
+                Reject
+            </button>
+
+        </form>
+
+    </div>
+
+
+    {% else %}
+
+    <div class="list-row">
+
+        <div>
+
+            <strong>
+                No pending holiday / leave requests
+            </strong>
+
+            <small>
+                New requests forwarded to you will appear here.
+            </small>
+
+        </div>
+
+    </div>
+
+    {% endfor %}
+
 </section>
 
-<section class="panel">
-<h2>Add Holiday</h2>
-<form class="form-grid one" method="post" action="{{url_for('head.add_holiday')}}">
-<input name="name" placeholder="Holiday name" required><input name="date" type="date" required><select name="holiday_type"><option>Company</option><option>Public</option><option>Optional</option></select><button>Add holiday</button>
-</form>
-</section>
+
+<!-- =====================================================
+     EMPLOYEES
+     ===================================================== -->
 
 <section class="panel">
-<h2>Raise Appraisal</h2>
-<form class="form-grid one" method="post" action="{{url_for('head.raise_appraisal')}}">
-<select name="employee_id" required><option value="">Select employee</option>{% for e in employees %}<option value="{{e.id}}">{{e.name}} · {{e.employee_id}}</option>{% endfor %}</select>
-<input name="cycle" placeholder="Appraisal cycle e.g. 2026-27" required><input name="next_date" type="date"><button>Raise appraisal</button>
-</form>
+
+    <h2>Department Employees</h2>
+
+    <div class="grid three">
+
+        {% for employee in employees %}
+
+        <div class="card">
+
+            <span class="eyebrow">
+                {{ employee.employee_id }}
+            </span>
+
+            <strong>
+                {{ employee.name }}
+            </strong>
+
+            <small>
+                {{ employee.designation or 'Employee' }}
+            </small>
+
+            <small>
+                {{ employee.email }}
+            </small>
+
+        </div>
+
+        {% else %}
+
+        <p class="muted">
+            No employees found in your department.
+        </p>
+
+        {% endfor %}
+
+    </div>
+
 </section>
-</div>
+
+
+<!-- =====================================================
+     APPRAISALS
+     ===================================================== -->
 
 <section class="panel">
-<h2>Department Audits</h2>
-<table><tr><th>Audit</th><th>Type</th><th>Date</th><th>Next date</th><th>Status</th></tr>
-{% for a in audits %}<tr><td>{{a.name}}</td><td>{{a.audit_type}}</td><td>{{a.audit_date}}</td><td>{{a.next_audit_date or '-'}}</td><td><span class="badge">{{a.status}}</span></td></tr>{% else %}<tr><td colspan="5">No audits yet.</td></tr>{% endfor %}
-</table>
+
+    <div class="between">
+
+        <div>
+            <h2>Appraisals</h2>
+
+            <p class="muted">
+                Raise and track employee appraisals.
+            </p>
+        </div>
+
+    </div>
+
+
+    <form
+        method="POST"
+        action="{{ url_for('head.raise_appraisal') }}"
+    >
+
+        <div class="form-grid">
+
+            <div>
+
+                <label>
+                    Employee
+                </label>
+
+                <select
+                    name="employee_id"
+                    required
+                >
+
+                    <option value="">
+                        Select employee
+                    </option>
+
+                    {% for employee in employees %}
+
+                    <option value="{{ employee.id }}">
+
+                        {{ employee.name }}
+                        — {{ employee.employee_id }}
+
+                    </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+
+            <div>
+
+                <label>
+                    Appraisal Cycle
+                </label>
+
+                <input
+                    type="text"
+                    name="cycle"
+                    placeholder="e.g. Annual 2026-27"
+                    required
+                >
+
+            </div>
+
+
+            <div>
+
+                <label>
+                    Next Review Date
+                </label>
+
+                <input
+                    type="date"
+                    name="next_date"
+                >
+
+            </div>
+
+        </div>
+
+
+        <div style="margin-top: 16px;">
+
+            <button
+                type="submit"
+                class="button"
+            >
+                Raise Appraisal
+            </button>
+
+        </div>
+
+    </form>
+
+
+    <hr>
+
+
+    {% for appraisal in appraisals %}
+
+    <div class="list-row">
+
+        <div>
+
+            <strong>
+                {{ appraisal.employee_id }}
+            </strong>
+
+            <small>
+                {{ appraisal.cycle }}
+                · {{ appraisal.stage }}
+            </small>
+
+        </div>
+
+        <span class="badge">
+            {{ appraisal.completion }}%
+        </span>
+
+    </div>
+
+    {% else %}
+
+    <p class="muted">
+        No appraisals have been raised yet.
+    </p>
+
+    {% endfor %}
+
 </section>
+
+
+<!-- =====================================================
+     SOP MANAGEMENT
+     ===================================================== -->
+
+<section class="panel">
+
+    <h2>SOP Repository</h2>
+
+    <p class="muted">
+        Upload SOP documents for your department.
+    </p>
+
+
+    <form
+        method="POST"
+        action="{{ url_for('head.upload_sop') }}"
+        enctype="multipart/form-data"
+    >
+
+        <div class="form-grid">
+
+            <div>
+
+                <label>
+                    SOP File
+                </label>
+
+                <input
+                    type="file"
+                    name="file"
+                    required
+                >
+
+            </div>
+
+
+            <div>
+
+                <label>
+                    SOP Code
+                </label>
+
+                <input
+                    type="text"
+                    name="code"
+                    placeholder="e.g. SOP-HR-001"
+                >
+
+            </div>
+
+
+            <div>
+
+                <label>
+                    Version
+                </label>
+
+                <input
+                    type="text"
+                    name="version"
+                    value="1.0"
+                >
+
+            </div>
+
+        </div>
+
+
+        <div style="margin-top: 16px;">
+
+            <button
+                type="submit"
+                class="button"
+            >
+                Upload SOP
+            </button>
+
+        </div>
+
+    </form>
+
+
+    <hr>
+
+
+    {% for sop in sops %}
+
+    <div class="list-row">
+
+        <div>
+
+            <strong>
+                {{ sop.name }}
+            </strong>
+
+            <small>
+                v{{ sop.version }}
+
+                {% if sop.code %}
+                · {{ sop.code }}
+                {% endif %}
+            </small>
+
+        </div>
+
+
+        <a
+            class="button"
+            href="{{ url_for('main.open_sop', sop_id=sop.id) }}"
+            target="_blank"
+        >
+            Open SOP ↗
+        </a>
+
+    </div>
+
+    {% else %}
+
+    <p class="muted">
+        No SOPs uploaded for this department.
+    </p>
+
+    {% endfor %}
+
+</section>
+
+
+<!-- =====================================================
+     AUDIT MANAGEMENT
+     ===================================================== -->
+
+<section class="panel">
+
+    <h2>ISO / GDP Audit Calendar</h2>
+
+    <p class="muted">
+        Add upcoming ISO or GDP audit dates.
+    </p>
+
+
+    <form
+        method="POST"
+        action="{{ url_for('head.add_audit') }}"
+    >
+
+        <div class="form-grid">
+
+            <div>
+
+                <label>
+                    Audit Name
+                </label>
+
+                <input
+                    type="text"
+                    name="name"
+                    placeholder="e.g. Annual ISO Audit"
+                    required
+                >
+
+            </div>
+
+
+            <div>
+
+                <label>
+                    Audit Type
+                </label>
+
+                <select
+                    name="audit_type"
+                    required
+                >
+
+                    <option value="">
+                        Select type
+                    </option>
+
+                    <option value="ISO">
+                        ISO
+                    </option>
+
+                    <option value="GDP">
+                        GDP
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <div>
+
+                <label>
+                    Auditor
+                </label>
+
+                <input
+                    type="text"
+                    name="auditor"
+                    placeholder="Auditor name"
+                >
+
+            </div>
+
+
+            <div>
+
+                <label>
+                    Audit Date
+                </label>
+
+                <input
+                    type="date"
+                    name="audit_date"
+                    required
+                >
+
+            </div>
+
+
+            <div>
+
+                <label>
+                    Next Audit Date
+                </label>
+
+                <input
+                    type="date"
+                    name="next_audit_date"
+                >
+
+            </div>
+
+        </div>
+
+
+        <div style="margin-top: 16px;">
+
+            <button
+                type="submit"
+                class="button"
+            >
+                Add Audit Date
+            </button>
+
+        </div>
+
+    </form>
+
+
+    <hr>
+
+
+    {% for audit in audits %}
+
+    <div class="list-row">
+
+        <div>
+
+            <strong>
+                {{ audit.name }}
+            </strong>
+
+            <small>
+
+                {{ audit.audit_type }}
+
+                · Audit:
+                {{ audit.audit_date }}
+
+                {% if audit.next_audit_date %}
+                · Next:
+                {{ audit.next_audit_date }}
+                {% endif %}
+
+            </small>
+
+        </div>
+
+
+        <span class="badge">
+            {{ audit.status }}
+        </span>
+
+    </div>
+
+    {% else %}
+
+    <p class="muted">
+        No audits scheduled for your department.
+    </p>
+
+    {% endfor %}
+
+</section>
+
+
+<!-- =====================================================
+     HOLIDAY MANAGEMENT
+     ===================================================== -->
+
+<section class="panel">
+
+    <h2>Holiday Calendar</h2>
+
+    <p class="muted">
+        Add company holidays to the calendar.
+    </p>
+
+
+    <form
+        method="POST"
+        action="{{ url_for('head.add_holiday') }}"
+    >
+
+        <div class="form-grid">
+
+            <div>
+
+                <label>
+                    Holiday Name
+                </label>
+
+                <input
+                    type="text"
+                    name="name"
+                    placeholder="Holiday name"
+                    required
+                >
+
+            </div>
+
+
+            <div>
+
+                <label>
+                    Date
+                </label>
+
+                <input
+                    type="date"
+                    name="date"
+                    required
+                >
+
+            </div>
+
+
+            <div>
+
+                <label>
+                    Type
+                </label>
+
+                <select
+                    name="holiday_type"
+                >
+
+                    <option value="Company">
+                        Company
+                    </option>
+
+                    <option value="National">
+                        National
+                    </option>
+
+                    <option value="Optional">
+                        Optional
+                    </option>
+
+                </select>
+
+            </div>
+
+        </div>
+
+
+        <div style="margin-top: 16px;">
+
+            <button
+                type="submit"
+                class="button"
+            >
+                Add Holiday
+            </button>
+
+        </div>
+
+    </form>
+
+
+    <hr>
+
+
+    {% for holiday in holidays %}
+
+    <div class="list-row">
+
+        <div>
+
+            <strong>
+                {{ holiday.name }}
+            </strong>
+
+            <small>
+                {{ holiday.date }}
+                · {{ holiday.holiday_type }}
+            </small>
+
+        </div>
+
+    </div>
+
+    {% else %}
+
+    <p class="muted">
+        No holidays found.
+    </p>
+
+    {% endfor %}
+
+</section>
+
+
+<!-- =====================================================
+     SYNC LOG
+     ===================================================== -->
+
+<section class="panel">
+
+    <h2>System Sync</h2>
+
+    {% for log in sync_logs %}
+
+    <div class="list-row">
+
+        <div>
+
+            <strong>
+                {{ log.source }}
+            </strong>
+
+            <small>
+                {{ log.message }}
+            </small>
+
+        </div>
+
+        <span class="badge">
+            {{ log.status }}
+        </span>
+
+    </div>
+
+    {% else %}
+
+    <p class="muted">
+        No sync activity recorded.
+    </p>
+
+    {% endfor %}
+
+</section>
+
 {% endblock %}
