@@ -92,15 +92,21 @@ def sync_data_files():
             if not row.get("name"):
                 continue
 
+            # Mrs. Manjula must not appear in the directory.
+            head_name = row.get(
+                "head_name", ""
+            ).strip()
+
+            if "manjula" in head_name.lower():
+                continue
+
             db.session.add(
                 Department(
                     name=row.get(
                         "name", ""
                     ).strip(),
 
-                    head_name=row.get(
-                        "head_name", ""
-                    ).strip(),
+                    head_name=head_name,
 
                     designation=row.get(
                         "designation", ""
@@ -247,12 +253,34 @@ def sync_data_files():
         # =================================================
         # TRAINING
         # =================================================
+        #
+        # CSV training records are synchronized into the DB.
+        #
+        # IMPORTANT:
+        # Training files uploaded from the Head dashboard are
+        # stored directly in the database and have a filename.
+        # They must NOT be deleted during every sync.
+        #
+        # Therefore:
+        #   1. Remove only CSV-sourced training records.
+        #   2. Keep uploaded training records that have a filename.
+        #   3. Add the current CSV training records.
+        #
+        # =================================================
 
         rows = _read_csv(
             data_folder / "training.csv"
         )
 
-        Training.query.delete()
+        # Delete only records that do not represent an
+        # uploaded file. Uploaded training records have
+        # a filename saved in the database.
+        Training.query.filter(
+            (Training.filename.is_(None)) |
+            (Training.filename == "")
+        ).delete(
+            synchronize_session=False
+        )
 
         for row in rows:
 
