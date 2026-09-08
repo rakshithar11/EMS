@@ -1,154 +1,323 @@
 {% extends "base.html" %}
 
-{% block title %}Knowledge & Compliance · EMS{% endblock %}
-
 {% block content %}
 
-<h1>Knowledge & Compliance</h1>
-
-<div class="grid two">
-
-    <section class="panel">
-
-        <h2>SOP Repository</h2>
-
-        {% for x in sops %}
-
-        <div class="list-row">
-
-            <div>
-                <strong>{{ x.name }}</strong>
-
-                <small>
-                    {{ x.department }}
-                    · v{{ x.version }}
-
-                    {% if x.code %}
-                    · {{ x.code }}
-                    {% endif %}
-                </small>
-            </div>
-
-            <div>
-                <span class="badge">Updated</span>
-
-                <a
-                    class="button"
-                    href="{{ url_for('main.open_sop', sop_id=x.id) }}"
-                    target="_blank"
-                >
-                    Open SOP ↗
-                </a>
-            </div>
-
-        </div>
-
-        {% else %}
-
-        <p>No SOPs uploaded.</p>
-
-        {% endfor %}
-
-    </section>
-
-
-    <section class="panel">
-
-        <h2>Training Library</h2>
-
-        {% for x in training %}
-
-        <div class="list-row">
-
-            <div>
-
-                <strong>{{ x.title }}</strong>
-
-                <small>
-                    {{ x.department }}
-                    · {{ x.duration or '-' }}
-
-                    {% if x.mandatory %}
-                    · Mandatory
-                    {% endif %}
-                </small>
-
-            </div>
-
-            {% if x.url %}
-
-            <a
-                class="button"
-                href="{{ x.url }}"
-                target="_blank"
-            >
-                Open ↗
-            </a>
-
-            {% endif %}
-
-        </div>
-
-        {% else %}
-
-        <p>No training records.</p>
-
-        {% endfor %}
-
-    </section>
-
+<div class="page-header">
+    <div>
+        <h1>Knowledge & Resources</h1>
+        <p>Access SOPs, training materials, audits, and other workplace resources.</p>
+    </div>
 </div>
 
 
-<section class="panel">
+<!-- ================= SOP REPOSITORY ================= -->
 
-    <h2>Audit Calendar</h2>
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2>SOP Repository</h2>
+            <p>Standard Operating Procedures and work instructions.</p>
+        </div>
+    </div>
 
-    <table>
+    {% if sops %}
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>SOP</th>
+                    <th>Department</th>
+                    <th>Description</th>
+                    <th>Version</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
 
-        <tr>
-            <th>Audit</th>
-            <th>Department</th>
-            <th>Type</th>
-            <th>Audit Date</th>
-            <th>Next Audit</th>
-            <th>Status</th>
-        </tr>
+            <tbody>
+                {% for sop in sops %}
+                <tr>
+                    <td>
+                        <strong>{{ sop.title }}</strong>
+                    </td>
 
-        {% for x in audits %}
+                    <td>
+                        {{ sop.department or "All Departments" }}
+                    </td>
 
-        <tr>
+                    <td>
+                        {{ sop.description or "-" }}
+                    </td>
 
-            <td>{{ x.name }}</td>
+                    <td>
+                        {{ sop.version or "-" }}
+                    </td>
 
-            <td>{{ x.department }}</td>
+                    <td>
+                        {% if sop.filename %}
+                        <a
+                            href="{{ url_for('main.open_sop', sop_id=sop.id) }}"
+                            target="_blank"
+                            class="btn btn-primary"
+                        >
+                            Open SOP
+                        </a>
+                        {% elif sop.url %}
+                        <a
+                            href="{{ sop.url }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="btn btn-primary"
+                        >
+                            Open SOP
+                        </a>
+                        {% else %}
+                        <span class="text-muted">No file</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
-            <td>{{ x.audit_type }}</td>
+    {% else %}
+    <div class="empty-state">
+        <p>No SOPs available.</p>
+    </div>
+    {% endif %}
+</div>
 
-            <td>{{ x.audit_date or '-' }}</td>
 
-            <td>{{ x.next_audit_date or '-' }}</td>
+<!-- ================= TRAINING LIBRARY ================= -->
 
-            <td>
-                <span class="badge">
-                    {{ x.status }}
-                </span>
-            </td>
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2>Training Library</h2>
+            <p>Training videos, PDFs, and other learning materials.</p>
+        </div>
+    </div>
 
-        </tr>
+    {% if trainings %}
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Training</th>
+                    <th>Department</th>
+                    <th>Description</th>
+                    <th>Type</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
 
-        {% else %}
+            <tbody>
+                {% for training in trainings %}
+                <tr>
+                    <td>
+                        <strong>{{ training.title }}</strong>
+                    </td>
 
-        <tr>
-            <td colspan="6">
-                No audits.
-            </td>
-        </tr>
+                    <td>
+                        {{ training.department or "All Departments" }}
+                    </td>
+
+                    <td>
+                        {{ training.description or "-" }}
+                    </td>
+
+                    <td>
+                        {% if training.filename %}
+                            {% set extension = training.filename.rsplit('.', 1)[-1].lower() if '.' in training.filename else '' %}
+
+                            {% if extension == 'pdf' %}
+                                PDF
+                            {% elif extension in ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'] %}
+                                Video
+                            {% else %}
+                                File
+                            {% endif %}
+
+                        {% elif training.url %}
+                            Video / Link
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if training.filename %}
+                            <a
+                                href="{{ url_for('main.open_training', training_id=training.id) }}"
+                                target="_blank"
+                                class="btn btn-primary"
+                            >
+                                {% set extension = training.filename.rsplit('.', 1)[-1].lower() if '.' in training.filename else '' %}
+
+                                {% if extension == 'pdf' %}
+                                    Open PDF
+                                {% elif extension in ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'] %}
+                                    Play Video
+                                {% else %}
+                                    Open File
+                                {% endif %}
+                            </a>
+
+                        {% elif training.url %}
+                            <a
+                                href="{{ training.url }}"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="btn btn-primary"
+                            >
+                                Open Training
+                            </a>
+
+                        {% else %}
+                            <span class="text-muted">No file</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% else %}
+    <div class="empty-state">
+        <p>No training materials available.</p>
+    </div>
+    {% endif %}
+</div>
+
+
+<!-- ================= AUDIT CALENDAR ================= -->
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2>Audit Calendar</h2>
+            <p>Upcoming ISO, GDP, and other compliance audits.</p>
+        </div>
+    </div>
+
+    {% if audits %}
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Audit</th>
+                    <th>Department</th>
+                    <th>Type</th>
+                    <th>Auditor</th>
+                    <th>Audit Date</th>
+                    <th>Next Audit</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for audit in audits %}
+                <tr>
+                    <td>
+                        <strong>{{ audit.name }}</strong>
+                    </td>
+
+                    <td>
+                        {{ audit.department or "-" }}
+                    </td>
+
+                    <td>
+                        {{ audit.audit_type or "-" }}
+                    </td>
+
+                    <td>
+                        {{ audit.auditor or "-" }}
+                    </td>
+
+                    <td>
+                        {% if audit.audit_date %}
+                            {{ audit.audit_date.strftime("%d %b %Y") }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if audit.next_audit_date %}
+                            {{ audit.next_audit_date.strftime("%d %b %Y") }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if audit.status %}
+                            {{ audit.status }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% else %}
+    <div class="empty-state">
+        <p>No audit information available.</p>
+    </div>
+    {% endif %}
+</div>
+
+
+<!-- ================= COMMON RESOURCES ================= -->
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2>Common Resources</h2>
+            <p>Frequently used workplace links.</p>
+        </div>
+    </div>
+
+    {% if resources %}
+    <div class="resource-grid">
+
+        {% for resource in resources %}
+
+        <div class="resource-item">
+            <div>
+                <strong>{{ resource.title }}</strong>
+
+                {% if resource.description %}
+                <p>{{ resource.description }}</p>
+                {% endif %}
+            </div>
+
+            {% if resource.url %}
+            <a
+                href="{{ resource.url }}"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="btn btn-secondary"
+            >
+                Open
+            </a>
+            {% endif %}
+        </div>
 
         {% endfor %}
 
-    </table>
+    </div>
 
-</section>
+    {% else %}
+    <div class="empty-state">
+        <p>No common resources available.</p>
+    </div>
+    {% endif %}
+</div>
+
 
 {% endblock %}
