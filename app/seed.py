@@ -2,7 +2,7 @@ from . import db
 from .models import User, Department
 
 
-def seed_data():
+def seed():
 
     # =========================================================
     # DEPARTMENT HEAD ACCOUNTS
