@@ -595,7 +595,7 @@ def knowledge():
             .all()
         ),
 
-        training=(
+        trainings=(
             Training.query
             .order_by(
                 Training.title
@@ -646,6 +646,43 @@ def open_sop(sop_id):
     return send_from_directory(
         current_app.config["UPLOAD_FOLDER"],
         sop.filename,
+        as_attachment=False
+    )
+
+
+# =========================================================
+# OPEN TRAINING MATERIAL
+# =========================================================
+
+@main_bp.route(
+    "/training/<int:training_id>"
+)
+@login_required
+def open_training(training_id):
+
+    training = db.session.get(
+        Training,
+        training_id
+    )
+
+    if not training or not training.filename:
+
+        abort(404)
+
+    file_path = (
+        Path(
+            current_app.config["UPLOAD_FOLDER"]
+        )
+        / training.filename
+    )
+
+    if not file_path.exists():
+
+        abort(404)
+
+    return send_from_directory(
+        current_app.config["UPLOAD_FOLDER"],
+        training.filename,
         as_attachment=False
     )
 
