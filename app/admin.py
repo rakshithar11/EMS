@@ -33,7 +33,7 @@ admin_bp = Blueprint("head", __name__)
 
 
 # =========================================================
-# DEPARTMENT HEAD ACCESS PROTECTION
+# DEPARTMENT HEAD ACCESS
 # =========================================================
 
 @admin_bp.before_request
@@ -59,11 +59,12 @@ def protect():
 @admin_bp.route("/")
 def dashboard():
 
+    # Requests specifically forwarded to this department head
     pending = (
         LeaveRequest.query
-        .filter_by(
-            department=current_user.department,
-            status="Pending"
+        .filter(
+            LeaveRequest.forwarded_to == current_user.email,
+            LeaveRequest.status == "Pending"
         )
         .order_by(
             LeaveRequest.created_at.desc()
@@ -71,6 +72,7 @@ def dashboard():
         .all()
     )
 
+    # Employees belonging to this department
     employees = (
         User.query
         .filter_by(
@@ -157,9 +159,15 @@ def leave_action(id, action):
         id
     )
 
+    # -----------------------------------------------------
+    # IMPORTANT:
+    # Only the department head selected by the employee
+    # can approve/reject the request.
+    # -----------------------------------------------------
+
     if (
         not req
-        or req.department != current_user.department
+        or req.forwarded_to != current_user.email
         or req.status != "Pending"
     ):
 
@@ -197,13 +205,12 @@ def leave_action(id, action):
         .strip()
     )
 
-    # -----------------------------------------------------
+    # =====================================================
     # APPROVE
-    # -----------------------------------------------------
+    # =====================================================
 
     if action == "approve":
 
-        # Paid leave
         if req.leave_type == "Paid":
 
             remaining = (
@@ -214,7 +221,8 @@ def leave_action(id, action):
             if req.days > remaining:
 
                 flash(
-                    "Approval blocked: employee does not have enough paid leave.",
+                    "Approval blocked: employee does not "
+                    "have enough paid leave.",
                     "danger"
                 )
 
@@ -224,7 +232,6 @@ def leave_action(id, action):
 
             employee.paid_leave_used += req.days
 
-        # Unpaid leave
         else:
 
             remaining = (
@@ -236,7 +243,8 @@ def leave_action(id, action):
             if req.days > remaining:
 
                 flash(
-                    "Approval blocked: employee does not have enough total leave.",
+                    "Approval blocked: employee does not "
+                    "have enough total leave.",
                     "danger"
                 )
 
@@ -248,9 +256,9 @@ def leave_action(id, action):
 
         req.status = "Approved"
 
-    # -----------------------------------------------------
+    # =====================================================
     # REJECT
-    # -----------------------------------------------------
+    # =====================================================
 
     elif action == "reject":
 
@@ -330,22 +338,23 @@ def upload_sop():
 
     f.save(path)
 
-    sop = SOP(
-        name=filename,
-        department=current_user.department,
-        version=request.form.get(
-            "version",
-            "1.0"
-        ),
-        code=request.form.get(
-            "code",
-            ""
-        ),
-        filename=filename,
-        uploaded_by=current_user.name
+    db.session.add(
+        SOP(
+            name=filename,
+            department=current_user.department,
+            version=request.form.get(
+                "version",
+                "1.0"
+            ),
+            code=request.form.get(
+                "code",
+                ""
+            ),
+            filename=filename,
+            uploaded_by=current_user.name
+        )
     )
 
-    db.session.add(sop)
     db.session.commit()
 
     flash(
@@ -367,10 +376,6 @@ def upload_sop():
     methods=["POST"]
 )
 def add_audit():
-
-    # -----------------------------------------------------
-    # READ AND VALIDATE DATES
-    # -----------------------------------------------------
 
     try:
 
@@ -401,10 +406,6 @@ def add_audit():
             url_for("head.dashboard")
         )
 
-    # -----------------------------------------------------
-    # VALIDATE AUDIT TYPE
-    # -----------------------------------------------------
-
     audit_type = (
         request.form
         .get("audit_type", "")
@@ -424,10 +425,6 @@ def add_audit():
         return redirect(
             url_for("head.dashboard")
         )
-
-    # -----------------------------------------------------
-    # READ FORM DATA
-    # -----------------------------------------------------
 
     name = (
         request.form
@@ -452,10 +449,6 @@ def add_audit():
             url_for("head.dashboard")
         )
 
-    # -----------------------------------------------------
-    # SAVE TO DATABASE
-    # -----------------------------------------------------
-
     audit = Audit(
         name=name,
         department=current_user.department,
@@ -470,10 +463,7 @@ def add_audit():
     db.session.commit()
 
     # -----------------------------------------------------
-    # ALSO SAVE TO CSV
-    #
-    # This is important because sync.py rebuilds the Audit
-    # table from audits.csv.
+    # Save to audits.csv as well so sync does not remove it.
     # -----------------------------------------------------
 
     csv_path = (
@@ -515,7 +505,6 @@ def add_audit():
         )
 
         if not file_exists:
-
             writer.writeheader()
 
         writer.writerow({
@@ -587,20 +576,14 @@ def add_holiday():
             url_for("head.dashboard")
         )
 
-    holiday_type = (
-        request.form
-        .get(
-            "holiday_type",
-            "Company"
-        )
-        .strip()
-    )
-
     db.session.add(
         Holiday(
             name=name,
             date=d,
-            holiday_type=holiday_type
+            holiday_type=request.form.get(
+                "holiday_type",
+                "Company"
+            )
         )
     )
 
@@ -655,7 +638,8 @@ def raise_appraisal():
     ):
 
         flash(
-            "You can only raise an appraisal for an employee in your department.",
+            "You can only raise an appraisal for an "
+            "employee in your department.",
             "danger"
         )
 
@@ -702,17 +686,18 @@ def raise_appraisal():
                 url_for("head.dashboard")
             )
 
-    appraisal = Appraisal(
-        employee_id=employee.employee_id,
-        department=employee.department,
-        cycle=cycle,
-        stage="Raised",
-        completion=10,
-        next_date=next_date,
-        raised_by=current_user.name
+    db.session.add(
+        Appraisal(
+            employee_id=employee.employee_id,
+            department=employee.department,
+            cycle=cycle,
+            stage="Raised",
+            completion=10,
+            next_date=next_date,
+            raised_by=current_user.name
+        )
     )
 
-    db.session.add(appraisal)
     db.session.commit()
 
     flash(
