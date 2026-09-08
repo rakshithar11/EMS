@@ -151,11 +151,9 @@ def dashboard():
 @login_required
 def attendance():
 
-    if current_user.role != "employee":
-
-        return redirect(
-            url_for("head.dashboard")
-        )
+    # =====================================================
+    # EVERY LOGGED-IN USER CAN LOG THEIR OWN ATTENDANCE
+    # =====================================================
 
     today = date.today()
 
@@ -170,7 +168,7 @@ def attendance():
 
     if request.method == "POST":
 
-        action = request.form["action"]
+        action = request.form.get("action", "").strip()
 
         # -------------------------------------------------
         # CHECK IN
@@ -246,25 +244,122 @@ def attendance():
                     "success"
                 )
 
+        else:
+
+            flash(
+                "Invalid attendance action.",
+                "danger"
+            )
+
         return redirect(
             url_for("main.attendance")
         )
 
-    rows = (
-        Attendance.query
-        .filter_by(
-            employee_id=current_user.employee_id
-        )
-        .order_by(
-            Attendance.date.desc()
-        )
-        .all()
+
+    # =====================================================
+    # ATTENDANCE VIEW PERMISSIONS
+    # =====================================================
+    #
+    # Employee:
+    #     Own attendance only
+    #
+    # Department Head:
+    #     Own attendance + employees in own department
+    #
+    # Admin / GM:
+    #     All employees
+    #
+    # =====================================================
+
+    can_view_all_attendance = (
+        current_user.role == "admin"
     )
+
+    if can_view_all_attendance:
+
+        rows = (
+            Attendance.query
+            .order_by(
+                Attendance.date.desc(),
+                Attendance.employee_id
+            )
+            .all()
+        )
+
+        attendance_users = (
+            User.query
+            .order_by(
+                User.name
+            )
+            .all()
+        )
+
+    elif current_user.role == "head":
+
+        department_employees = (
+            User.query
+            .filter_by(
+                department=current_user.department
+            )
+            .all()
+        )
+
+        employee_ids = [
+            user.employee_id
+            for user in department_employees
+        ]
+
+        # Always include the head's own attendance.
+        if current_user.employee_id not in employee_ids:
+            employee_ids.append(
+                current_user.employee_id
+            )
+
+        rows = (
+            Attendance.query
+            .filter(
+                Attendance.employee_id.in_(employee_ids)
+            )
+            .order_by(
+                Attendance.date.desc(),
+                Attendance.employee_id
+            )
+            .all()
+        )
+
+        attendance_users = department_employees
+
+        if current_user.employee_id not in [
+            user.employee_id
+            for user in attendance_users
+        ]:
+            attendance_users.append(current_user)
+
+    else:
+
+        rows = (
+            Attendance.query
+            .filter_by(
+                employee_id=current_user.employee_id
+            )
+            .order_by(
+                Attendance.date.desc()
+            )
+            .all()
+        )
+
+        attendance_users = [current_user]
+
 
     return render_template(
         "attendance.html",
         rows=rows,
-        today_record=record
+        today_record=record,
+        attendance_users=attendance_users,
+        can_view_all_attendance=(
+            can_view_all_attendance
+            or current_user.role == "head"
+        )
     )
 
 
@@ -284,6 +379,7 @@ def leave():
         return redirect(
             url_for("head.dashboard")
         )
+
 
     if request.method == "POST":
 
@@ -314,21 +410,31 @@ def leave():
                 url_for("main.leave")
             )
 
+
         days = (
             end - start
         ).days + 1
 
+
         leave_type = (
             request.form
-            .get("leave_type", "")
+            .get(
+                "leave_type",
+                ""
+            )
             .strip()
         )
 
+
         selected_head_email = (
             request.form
-            .get("forward_to", "")
+            .get(
+                "forward_to",
+                ""
+            )
             .strip()
         )
+
 
         # -------------------------------------------------
         # VALIDATE LEAVE TYPE
@@ -348,6 +454,7 @@ def leave():
                 url_for("main.leave")
             )
 
+
         # -------------------------------------------------
         # FIND SELECTED DEPARTMENT HEAD
         #
@@ -363,6 +470,7 @@ def leave():
             .first()
         )
 
+
         if not selected_head:
 
             flash(
@@ -373,6 +481,7 @@ def leave():
             return redirect(
                 url_for("main.leave")
             )
+
 
         # -------------------------------------------------
         # LEAVE BALANCES
@@ -388,6 +497,7 @@ def leave():
             - current_user.paid_leave_used
             - current_user.unpaid_leave_used
         )
+
 
         # -------------------------------------------------
         # VALIDATE DAYS
@@ -440,6 +550,7 @@ def leave():
                 .first()
             )
 
+
             if overlapping:
 
                 flash(
@@ -451,6 +562,7 @@ def leave():
                 return redirect(
                     url_for("main.leave")
                 )
+
 
             # -------------------------------------------------
             # CREATE REQUEST
@@ -497,6 +609,7 @@ def leave():
             url_for("main.leave")
         )
 
+
     # =====================================================
     # GET REQUEST
     # =====================================================
@@ -512,11 +625,13 @@ def leave():
         .all()
     )
 
+
     paid_remaining = max(
         0,
         current_user.paid_leave_limit
         - current_user.paid_leave_used
     )
+
 
     total_remaining = max(
         0,
@@ -524,6 +639,7 @@ def leave():
         - current_user.paid_leave_used
         - current_user.unpaid_leave_used
     )
+
 
     # -----------------------------------------------------
     # DEPARTMENT HEADS
@@ -544,6 +660,7 @@ def leave():
         )
         .all()
     )
+
 
     return render_template(
         "leave.html",
@@ -632,6 +749,7 @@ def open_sop(sop_id):
 
         abort(404)
 
+
     file_path = (
         Path(
             current_app.config["UPLOAD_FOLDER"]
@@ -639,9 +757,11 @@ def open_sop(sop_id):
         / sop.filename
     )
 
+
     if not file_path.exists():
 
         abort(404)
+
 
     return send_from_directory(
         current_app.config["UPLOAD_FOLDER"],
@@ -669,6 +789,7 @@ def open_training(training_id):
 
         abort(404)
 
+
     file_path = (
         Path(
             current_app.config["UPLOAD_FOLDER"]
@@ -676,9 +797,11 @@ def open_training(training_id):
         / training.filename
     )
 
+
     if not file_path.exists():
 
         abort(404)
+
 
     return send_from_directory(
         current_app.config["UPLOAD_FOLDER"],
@@ -706,7 +829,9 @@ def departments():
         .strip()
     )
 
+
     query = Department.query
+
 
     if q:
 
@@ -722,6 +847,7 @@ def departments():
             )
         )
 
+
     departments = (
         query
         .order_by(
@@ -729,6 +855,7 @@ def departments():
         )
         .all()
     )
+
 
     # -----------------------------------------------------
     # REMOVE OLD MANJULA RECORD
@@ -747,6 +874,7 @@ def departments():
             department.head_name.lower()
         )
     ]
+
 
     return render_template(
         "departments.html",
@@ -774,7 +902,9 @@ def resources():
         .strip()
     )
 
+
     query = CommonURL.query
+
 
     if q:
 
@@ -789,6 +919,7 @@ def resources():
                 .ilike(f"%{q}%")
             )
         )
+
 
     return render_template(
         "resources.html",
