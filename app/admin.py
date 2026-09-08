@@ -1,130 +1,193 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
-from flask_login import login_required, current_user
-from werkzeug.utils import secure_filename
 from pathlib import Path
 from datetime import datetime
+import csv
+
+from flask import (
+    Blueprint,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    flash,
+    current_app
+)
+
+from flask_login import login_required, current_user
+from werkzeug.utils import secure_filename
 
 from . import db
 from .models import (
     User,
     LeaveRequest,
-    Appraisal,
     SOP,
+    Appraisal,
     Audit,
     Holiday,
+    CommonURL,
     Training,
+    SyncLog
 )
 
-admin_bp = Blueprint("admin", __name__)
+
+admin_bp = Blueprint("head", __name__)
 
 
-# ============================================================
-# ACCESS CONTROL
-# ============================================================
+# =========================================================
+# DEPARTMENT HEAD / ADMIN ACCESS
+# =========================================================
 
+@admin_bp.before_request
+@login_required
 def protect():
-    if not current_user.is_authenticated:
-        return redirect(url_for("auth.login"))
 
     if current_user.role not in ("head", "admin"):
-        flash("You do not have permission to access this page.", "danger")
-        return redirect(url_for("main.dashboard"))
 
-    return None
+        flash(
+            "You do not have permission to access this section.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("main.dashboard")
+        )
 
 
-# ============================================================
-# HEAD / ADMIN DASHBOARD
-# ============================================================
+# =========================================================
+# DEPARTMENT HEAD / ADMIN DASHBOARD
+# =========================================================
 
 @admin_bp.route("/")
-@login_required
 def dashboard():
 
-    blocked = protect()
-    if blocked:
-        return blocked
+    # -----------------------------------------------------
+    # ADMIN / GENERAL MANAGER
+    #
+    # Can see ALL pending leave requests.
+    # -----------------------------------------------------
 
     if current_user.role == "admin":
 
         pending = (
             LeaveRequest.query
-            .filter_by(status="Pending")
-            .order_by(LeaveRequest.created_at.desc())
+            .filter(
+                LeaveRequest.status == "Pending"
+            )
+            .order_by(
+                LeaveRequest.created_at.desc()
+            )
             .all()
         )
 
         employees = (
             User.query
-            .filter_by(role="employee")
-            .order_by(User.name)
+            .filter_by(
+                role="employee"
+            )
+            .order_by(
+                User.department,
+                User.name
+            )
             .all()
         )
 
         appraisals = (
             Appraisal.query
-            .order_by(Appraisal.created_at.desc())
+            .order_by(
+                Appraisal.created_at.desc()
+            )
             .all()
         )
 
         audits = (
             Audit.query
-            .order_by(Audit.audit_date)
+            .order_by(
+                Audit.audit_date
+            )
             .all()
         )
 
         sops = (
             SOP.query
-            .order_by(SOP.created_at.desc())
+            .order_by(
+                SOP.uploaded_at.desc()
+            )
             .all()
         )
 
         trainings = (
             Training.query
-            .order_by(Training.uploaded_at.desc())
+            .order_by(
+                Training.uploaded_at.desc()
+            )
             .all()
         )
+
+    # -----------------------------------------------------
+    # REGULAR DEPARTMENT HEAD
+    #
+    # Can see requests specifically forwarded to them and
+    # manages only their own department's records.
+    # -----------------------------------------------------
 
     else:
 
         pending = (
             LeaveRequest.query
             .filter(
-                LeaveRequest.forwarded_to == current_user.email,
-                LeaveRequest.status == "Pending"
+                LeaveRequest.forwarded_to
+                == current_user.email,
+
+                LeaveRequest.status
+                == "Pending"
             )
-            .order_by(LeaveRequest.created_at.desc())
+            .order_by(
+                LeaveRequest.created_at.desc()
+            )
             .all()
         )
 
         employees = (
             User.query
-            .filter(
-                User.role == "employee",
-                User.department == current_user.department
+            .filter_by(
+                department=current_user.department,
+                role="employee"
             )
-            .order_by(User.name)
+            .order_by(
+                User.name
+            )
             .all()
         )
 
         appraisals = (
             Appraisal.query
-            .filter_by(department=current_user.department)
-            .order_by(Appraisal.created_at.desc())
+            .filter_by(
+                department=current_user.department
+            )
+            .order_by(
+                Appraisal.created_at.desc()
+            )
             .all()
         )
 
         audits = (
             Audit.query
-            .filter_by(department=current_user.department)
-            .order_by(Audit.audit_date)
+            .filter_by(
+                department=current_user.department
+            )
+            .order_by(
+                Audit.audit_date
+            )
             .all()
         )
 
         sops = (
             SOP.query
-            .filter_by(department=current_user.department)
-            .order_by(SOP.created_at.desc())
+            .filter_by(
+                department=current_user.department
+            )
+            .order_by(
+                SOP.uploaded_at.desc()
+            )
             .all()
         )
 
@@ -135,9 +198,32 @@ def dashboard():
                 (Training.department.is_(None)) |
                 (Training.department == "")
             )
-            .order_by(Training.uploaded_at.desc())
+            .order_by(
+                Training.uploaded_at.desc()
+            )
             .all()
         )
+
+    # -----------------------------------------------------
+    # COMMON DATA
+    # -----------------------------------------------------
+
+    holidays = (
+        Holiday.query
+        .order_by(
+            Holiday.date
+        )
+        .all()
+    )
+
+    sync_logs = (
+        SyncLog.query
+        .order_by(
+            SyncLog.synced_at.desc()
+        )
+        .limit(8)
+        .all()
+    )
 
     return render_template(
         "head.html",
@@ -147,222 +233,308 @@ def dashboard():
         audits=audits,
         sops=sops,
         trainings=trainings,
+        holidays=holidays,
+        sync_logs=sync_logs
     )
 
 
-# ============================================================
-# LEAVE REQUEST ACTION
-# ============================================================
+# =========================================================
+# LEAVE APPROVAL / REJECTION
+# =========================================================
 
-@admin_bp.route("/leave/<int:leave_id>/<action>", methods=["POST"])
-@login_required
-def leave_action(leave_id, action):
+@admin_bp.route(
+    "/leave/<int:id>/<action>",
+    methods=["POST"]
+)
+def leave_action(id, action):
 
-    blocked = protect()
-    if blocked:
-        return blocked
+    req = db.session.get(
+        LeaveRequest,
+        id
+    )
 
-    leave = db.session.get(LeaveRequest, leave_id)
+    if not req:
 
-    if not leave:
-        flash("Leave request not found.", "danger")
-        return redirect(url_for("admin.dashboard"))
+        flash(
+            "Leave request could not be found.",
+            "danger"
+        )
 
-    if leave.status != "Pending":
-        flash("This leave request has already been processed.", "warning")
-        return redirect(url_for("admin.dashboard"))
+        return redirect(
+            url_for("head.dashboard")
+        )
 
-    # Regular department heads can only process requests
-    # specifically forwarded to them.
+    # -----------------------------------------------------
+    # REGULAR HEAD
+    #
+    # Only the selected recipient can approve/reject.
+    # -----------------------------------------------------
+
     if current_user.role == "head":
-        if leave.forwarded_to != current_user.email:
+
+        if req.forwarded_to != current_user.email:
+
             flash(
-                "This leave request was not forwarded to you.",
+                "This request was not forwarded to you.",
                 "danger"
             )
-            return redirect(url_for("admin.dashboard"))
+
+            return redirect(
+                url_for("head.dashboard")
+            )
+
+    # -----------------------------------------------------
+    # ADMIN / GM
+    #
+    # Can approve/reject requests from ALL departments.
+    # -----------------------------------------------------
+
+    if req.status != "Pending":
+
+        flash(
+            "This request has already been processed.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("head.dashboard")
+        )
+
+    employee = (
+        User.query
+        .filter_by(
+            employee_id=req.employee_id
+        )
+        .first()
+    )
+
+    if not employee:
+
+        flash(
+            "Employee record could not be found.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("head.dashboard")
+        )
+
+    req.head_comment = (
+        request.form
+        .get(
+            "comment",
+            ""
+        )
+        .strip()
+    )
+
+    # =====================================================
+    # APPROVE
+    # =====================================================
 
     if action == "approve":
 
-        employee = db.session.get(User, leave.user_id)
+        if req.leave_type == "Paid":
 
-        if not employee:
-            flash("Employee not found.", "danger")
-            return redirect(url_for("admin.dashboard"))
-
-        days = leave.days
-
-        # Re-check balances before approval.
-        if days <= 0:
-            flash("Invalid leave duration.", "danger")
-            return redirect(url_for("admin.dashboard"))
-
-        total_used = (
-            employee.paid_leave_used +
-            employee.unpaid_leave_used
-        )
-
-        remaining_total = employee.total_leave - total_used
-
-        if days > remaining_total:
-            flash(
-                "Leave cannot be approved because the employee "
-                "does not have enough total leave balance.",
-                "danger"
-            )
-            return redirect(url_for("admin.dashboard"))
-
-        if leave.leave_type == "Paid":
-
-            remaining_paid = (
-                employee.paid_leave_limit -
-                employee.paid_leave_used
+            remaining = (
+                employee.paid_leave_limit
+                - employee.paid_leave_used
             )
 
-            if days > remaining_paid:
+            if req.days > remaining:
+
                 flash(
-                    "Leave cannot be approved because the employee "
-                    "does not have enough paid leave balance.",
+                    "Approval blocked: employee does not "
+                    "have enough paid leave.",
                     "danger"
                 )
-                return redirect(url_for("admin.dashboard"))
 
-            employee.paid_leave_used += days
+                return redirect(
+                    url_for("head.dashboard")
+                )
+
+            employee.paid_leave_used += req.days
 
         else:
-            employee.unpaid_leave_used += days
 
-        leave.status = "Approved"
+            remaining = (
+                employee.total_leave
+                - employee.paid_leave_used
+                - employee.unpaid_leave_used
+            )
 
-        flash(
-            f"Leave request from {employee.name} approved.",
-            "success"
-        )
+            if req.days > remaining:
+
+                flash(
+                    "Approval blocked: employee does not "
+                    "have enough total leave.",
+                    "danger"
+                )
+
+                return redirect(
+                    url_for("head.dashboard")
+                )
+
+            employee.unpaid_leave_used += req.days
+
+        req.status = "Approved"
+
+    # =====================================================
+    # REJECT
+    # =====================================================
 
     elif action == "reject":
 
-        leave.status = "Rejected"
+        req.status = "Rejected"
+
+    else:
 
         flash(
-            "Leave request rejected.",
-            "success"
+            "Invalid leave action.",
+            "danger"
         )
 
-    else:
-        flash("Invalid action.", "danger")
-        return redirect(url_for("admin.dashboard"))
+        return redirect(
+            url_for("head.dashboard")
+        )
 
     db.session.commit()
 
-    return redirect(url_for("admin.dashboard"))
+    flash(
+        f"Leave request {req.status.lower()}.",
+        "success"
+    )
+
+    return redirect(
+        url_for("head.dashboard")
+    )
 
 
-# ============================================================
-# SOP UPLOAD
-# ============================================================
+# =========================================================
+# UPLOAD SOP
+# =========================================================
 
-@admin_bp.route("/upload-sop", methods=["POST"])
-@login_required
+@admin_bp.route(
+    "/upload-sop",
+    methods=["POST"]
+)
 def upload_sop():
 
-    blocked = protect()
-    if blocked:
-        return blocked
+    f = request.files.get("file")
 
-    title = request.form.get("title", "").strip()
-    description = request.form.get("description", "").strip()
-    version = request.form.get("version", "").strip()
+    if not f or not f.filename:
 
-    if current_user.role == "admin":
-        department = request.form.get("department", "").strip()
-    else:
-        department = current_user.department
+        flash(
+            "Choose an SOP file.",
+            "danger"
+        )
 
-    file = request.files.get("file")
+        return redirect(
+            url_for("head.dashboard")
+        )
 
-    if not title:
-        flash("Please enter an SOP title.", "danger")
-        return redirect(url_for("admin.dashboard"))
-
-    if not file or not file.filename:
-        flash("Please select an SOP PDF file.", "danger")
-        return redirect(url_for("admin.dashboard"))
-
-    original_name = secure_filename(file.filename)
-
-    if not original_name:
-        flash("Invalid file name.", "danger")
-        return redirect(url_for("admin.dashboard"))
-
-    extension = Path(original_name).suffix.lower()
-
-    if extension != ".pdf":
-        flash("SOP files must be PDF files.", "danger")
-        return redirect(url_for("admin.dashboard"))
-
-    upload_folder = Path(current_app.config["UPLOAD_FOLDER"])
-    upload_folder.mkdir(parents=True, exist_ok=True)
-
-    filename = (
-        f"sop_{datetime.now().strftime('%Y%m%d%H%M%S')}_"
-        f"{original_name}"
+    filename = secure_filename(
+        f.filename
     )
 
-    file.save(upload_folder / filename)
+    if not filename:
 
-    sop = SOP(
-        title=title,
-        department=department,
-        description=description,
-        version=version,
-        filename=filename,
+        flash(
+            "Invalid file name.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("head.dashboard")
+        )
+
+    upload_folder = Path(
+        current_app.config["UPLOAD_FOLDER"]
     )
 
-    db.session.add(sop)
+    upload_folder.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    path = upload_folder / filename
+
+    f.save(path)
+
+    db.session.add(
+        SOP(
+            name=filename,
+            department=current_user.department,
+            version=request.form.get(
+                "version",
+                "1.0"
+            ),
+            code=request.form.get(
+                "code",
+                ""
+            ),
+            filename=filename,
+            uploaded_by=current_user.name
+        )
+    )
+
     db.session.commit()
 
-    flash("SOP uploaded successfully.", "success")
+    flash(
+        "SOP uploaded successfully.",
+        "success"
+    )
 
-    return redirect(url_for("admin.dashboard"))
+    return redirect(
+        url_for("head.dashboard")
+    )
 
 
-# ============================================================
-# TRAINING UPLOAD
-# ============================================================
+# =========================================================
+# UPLOAD TRAINING MATERIAL
+# =========================================================
 
-@admin_bp.route("/upload-training", methods=["POST"])
-@login_required
+@admin_bp.route(
+    "/upload-training",
+    methods=["POST"]
+)
 def upload_training():
 
-    blocked = protect()
-    if blocked:
-        return blocked
+    # -----------------------------------------------------
+    # GET FILE
+    # -----------------------------------------------------
 
-    title = request.form.get("title", "").strip()
-    description = request.form.get("description", "").strip()
+    f = request.files.get("file")
 
-    if current_user.role == "admin":
-        department = request.form.get("department", "").strip()
-    else:
-        department = current_user.department
+    if not f or not f.filename:
 
-    file = request.files.get("file")
+        flash(
+            "Choose a training file.",
+            "danger"
+        )
 
-    if not title:
-        flash("Please enter a training title.", "danger")
-        return redirect(url_for("admin.dashboard"))
+        return redirect(
+            url_for("head.dashboard")
+        )
 
-    if not file or not file.filename:
-        flash("Please select a training file.", "danger")
-        return redirect(url_for("admin.dashboard"))
+    filename = secure_filename(
+        f.filename
+    )
 
-    original_name = secure_filename(file.filename)
+    if not filename:
 
-    if not original_name:
-        flash("Invalid file name.", "danger")
-        return redirect(url_for("admin.dashboard"))
+        flash(
+            "Invalid file name.",
+            "danger"
+        )
 
-    extension = Path(original_name).suffix.lower()
+        return redirect(
+            url_for("head.dashboard")
+        )
+
+    # -----------------------------------------------------
+    # ALLOWED FILE TYPES
+    # -----------------------------------------------------
 
     allowed_extensions = {
         ".pdf",
@@ -371,262 +543,548 @@ def upload_training():
         ".ogg",
         ".mov",
         ".avi",
-        ".mkv",
+        ".mkv"
     }
 
+    extension = Path(
+        filename
+    ).suffix.lower()
+
     if extension not in allowed_extensions:
+
         flash(
             "Training files must be PDF or video files "
-            "(MP4, WebM, OGG, MOV, AVI, or MKV).",
+            "(PDF, MP4, WebM, OGG, MOV, AVI or MKV).",
             "danger"
         )
-        return redirect(url_for("admin.dashboard"))
 
-    upload_folder = Path(current_app.config["UPLOAD_FOLDER"])
-    upload_folder.mkdir(parents=True, exist_ok=True)
+        return redirect(
+            url_for("head.dashboard")
+        )
 
-    filename = (
-        f"training_{datetime.now().strftime('%Y%m%d%H%M%S')}_"
-        f"{original_name}"
+    # -----------------------------------------------------
+    # TRAINING INFORMATION
+    # -----------------------------------------------------
+
+    title = (
+        request.form
+        .get(
+            "title",
+            ""
+        )
+        .strip()
     )
 
-    file.save(upload_folder / filename)
+    description = (
+        request.form
+        .get(
+            "description",
+            ""
+        )
+        .strip()
+    )
+
+    # -----------------------------------------------------
+    # DEPARTMENT
+    #
+    # ADMIN / GM can select a department.
+    # REGULAR HEAD automatically uses their department.
+    # -----------------------------------------------------
+
+    if current_user.role == "admin":
+
+        training_department = (
+            request.form
+            .get(
+                "department",
+                ""
+            )
+            .strip()
+        )
+
+        if not training_department:
+
+            training_department = current_user.department
+
+    else:
+
+        training_department = current_user.department
+
+    # -----------------------------------------------------
+    # TITLE IS REQUIRED
+    # -----------------------------------------------------
+
+    if not title:
+
+        flash(
+            "Training title is required.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("head.dashboard")
+        )
+
+    # -----------------------------------------------------
+    # SAVE FILE
+    # -----------------------------------------------------
+
+    upload_folder = Path(
+        current_app.config["UPLOAD_FOLDER"]
+    )
+
+    upload_folder.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    # Timestamp prevents files with the same name from
+    # overwriting each other.
+
+    saved_filename = (
+        f"training_"
+        f"{datetime.now().strftime('%Y%m%d%H%M%S%f')}_"
+        f"{filename}"
+    )
+
+    path = (
+        upload_folder
+        / saved_filename
+    )
+
+    f.save(path)
+
+    # -----------------------------------------------------
+    # SAVE TRAINING RECORD
+    # -----------------------------------------------------
 
     training = Training(
         title=title,
-        department=department,
+        department=training_department,
         description=description,
-        filename=filename,
+        filename=saved_filename,
         uploaded_by=current_user.name,
-        uploaded_at=datetime.utcnow(),
+        uploaded_at=datetime.utcnow()
     )
 
-    db.session.add(training)
+    db.session.add(
+        training
+    )
+
     db.session.commit()
 
-    flash("Training material uploaded successfully.", "success")
+    flash(
+        "Training material uploaded successfully.",
+        "success"
+    )
 
-    return redirect(url_for("admin.dashboard"))
+    return redirect(
+        url_for("head.dashboard")
+    )
 
 
-# ============================================================
+# =========================================================
 # ADD AUDIT
-# ============================================================
+# =========================================================
 
-@admin_bp.route("/add-audit", methods=["POST"])
-@login_required
+@admin_bp.route(
+    "/add-audit",
+    methods=["POST"]
+)
 def add_audit():
 
-    blocked = protect()
-    if blocked:
-        return blocked
-
-    name = request.form.get("name", "").strip()
-    audit_type = request.form.get("audit_type", "").strip()
-    auditor = request.form.get("auditor", "").strip()
-    audit_date_text = request.form.get("audit_date", "").strip()
-    next_audit_date_text = request.form.get(
-        "next_audit_date",
-        ""
-    ).strip()
-    status = request.form.get("status", "Upcoming").strip()
-
-    if current_user.role == "admin":
-        department = request.form.get("department", "").strip()
-    else:
-        department = current_user.department
-
-    if not name or not audit_date_text:
-        flash(
-            "Audit name and audit date are required.",
-            "danger"
-        )
-        return redirect(url_for("admin.dashboard"))
-
     try:
+
         audit_date = datetime.strptime(
-            audit_date_text,
+            request.form["audit_date"],
             "%Y-%m-%d"
         ).date()
-    except ValueError:
-        flash("Invalid audit date.", "danger")
-        return redirect(url_for("admin.dashboard"))
 
-    next_audit_date = None
-
-    if next_audit_date_text:
-        try:
-            next_audit_date = datetime.strptime(
-                next_audit_date_text,
+        next_date = (
+            datetime.strptime(
+                request.form["next_audit_date"],
                 "%Y-%m-%d"
             ).date()
-        except ValueError:
-            flash("Invalid next audit date.", "danger")
-            return redirect(url_for("admin.dashboard"))
+            if request.form.get(
+                "next_audit_date"
+            )
+            else None
+        )
+
+    except (ValueError, KeyError):
+
+        flash(
+            "Invalid audit date.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("head.dashboard")
+        )
+
+    audit_type = (
+        request.form
+        .get(
+            "audit_type",
+            ""
+        )
+        .strip()
+    )
+
+    if audit_type not in (
+        "ISO",
+        "GDP"
+    ):
+
+        flash(
+            "Audit type must be ISO or GDP.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("head.dashboard")
+        )
+
+    name = (
+        request.form
+        .get(
+            "name",
+            ""
+        )
+        .strip()
+    )
+
+    auditor = (
+        request.form
+        .get(
+            "auditor",
+            ""
+        )
+        .strip()
+    )
+
+    if not name:
+
+        flash(
+            "Audit name is required.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("head.dashboard")
+        )
+
+    # -----------------------------------------------------
+    # ADMIN / GM CAN SELECT A DEPARTMENT.
+    # REGULAR HEAD USES THEIR OWN DEPARTMENT.
+    # -----------------------------------------------------
+
+    if current_user.role == "admin":
+
+        audit_department = (
+            request.form
+            .get(
+                "department",
+                ""
+            )
+            .strip()
+        )
+
+        if not audit_department:
+
+            audit_department = current_user.department
+
+    else:
+
+        audit_department = current_user.department
 
     audit = Audit(
         name=name,
-        department=department,
+        department=audit_department,
         audit_type=audit_type,
         auditor=auditor,
         audit_date=audit_date,
-        next_audit_date=next_audit_date,
-        status=status,
+        next_audit_date=next_date,
+        status="Upcoming"
     )
 
     db.session.add(audit)
+    db.session.commit()
 
-    # Keep audit information in the CSV source as well,
-    # because sync.py rebuilds audit records from the CSV.
+    # -----------------------------------------------------
+    # ALSO SAVE TO CSV
+    # -----------------------------------------------------
+
     csv_path = (
-        Path(current_app.config["DATA_FOLDER"]) /
-        "audits.csv"
+        Path(
+            current_app.config["DATA_FOLDER"]
+        )
+        / "audits.csv"
     )
 
-    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    csv_path.parent.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
-    import csv
+    fieldnames = [
+        "name",
+        "department",
+        "audit_type",
+        "auditor",
+        "audit_date",
+        "next_audit_date",
+        "status"
+    ]
 
-    file_exists = csv_path.exists()
+    file_exists = (
+        csv_path.exists()
+        and csv_path.stat().st_size > 0
+    )
 
-    with open(
-        csv_path,
+    with csv_path.open(
         "a",
         newline="",
         encoding="utf-8"
     ) as f:
 
-        writer = csv.writer(f)
+        writer = csv.DictWriter(
+            f,
+            fieldnames=fieldnames
+        )
 
         if not file_exists:
-            writer.writerow([
-                "name",
-                "department",
-                "audit_type",
-                "auditor",
-                "audit_date",
-                "next_audit_date",
-                "status",
-            ])
+            writer.writeheader()
 
-        writer.writerow([
-            name,
-            department,
-            audit_type,
-            auditor,
-            audit_date.isoformat(),
-            next_audit_date.isoformat()
-            if next_audit_date else "",
-            status,
-        ])
-
-    db.session.commit()
-
-    flash("Audit added successfully.", "success")
-
-    return redirect(url_for("admin.dashboard"))
-
-
-# ============================================================
-# ADD HOLIDAY
-# ============================================================
-
-@admin_bp.route("/add-holiday", methods=["POST"])
-@login_required
-def add_holiday():
-
-    blocked = protect()
-    if blocked:
-        return blocked
-
-    name = request.form.get("name", "").strip()
-    date_text = request.form.get("date", "").strip()
-
-    if not name or not date_text:
-        flash(
-            "Holiday name and date are required.",
-            "danger"
-        )
-        return redirect(url_for("admin.dashboard"))
-
-    try:
-        holiday_date = datetime.strptime(
-            date_text,
-            "%Y-%m-%d"
-        ).date()
-    except ValueError:
-        flash("Invalid holiday date.", "danger")
-        return redirect(url_for("admin.dashboard"))
-
-    holiday = Holiday(
-        name=name,
-        date=holiday_date,
-    )
-
-    db.session.add(holiday)
-    db.session.commit()
-
-    flash("Holiday added successfully.", "success")
-
-    return redirect(url_for("admin.dashboard"))
-
-
-# ============================================================
-# RAISE APPRAISAL
-# ============================================================
-
-@admin_bp.route("/raise-appraisal", methods=["POST"])
-@login_required
-def raise_appraisal():
-
-    blocked = protect()
-    if blocked:
-        return blocked
-
-    employee_id = request.form.get("employee_id", "").strip()
-    cycle = request.form.get("cycle", "").strip()
-    status = request.form.get("status", "Pending").strip()
-    comments = request.form.get("comments", "").strip()
-
-    employee = User.query.filter_by(
-        employee_id=employee_id
-    ).first()
-
-    if not employee:
-        flash("Employee not found.", "danger")
-        return redirect(url_for("admin.dashboard"))
-
-    # Regular heads can only raise appraisals
-    # for employees in their own department.
-    if current_user.role == "head":
-
-        if employee.department != current_user.department:
-            flash(
-                "You can only raise appraisals for employees "
-                "in your department.",
-                "danger"
-            )
-            return redirect(url_for("admin.dashboard"))
-
-    if not cycle:
-        flash("Please enter an appraisal cycle.", "danger")
-        return redirect(url_for("admin.dashboard"))
-
-    appraisal = Appraisal(
-        employee_id=employee.id,
-        employee_name=employee.name,
-        department=employee.department,
-        cycle=cycle,
-        status=status,
-        comments=comments,
-    )
-
-    db.session.add(appraisal)
-    db.session.commit()
+        writer.writerow({
+            "name": name,
+            "department": audit_department,
+            "audit_type": audit_type,
+            "auditor": auditor,
+            "audit_date": audit_date.isoformat(),
+            "next_audit_date": (
+                next_date.isoformat()
+                if next_date
+                else ""
+            ),
+            "status": "Upcoming"
+        })
 
     flash(
-        f"Appraisal raised for {employee.name}.",
+        "Audit date added.",
         "success"
     )
 
-    return redirect(url_for("admin.dashboard"))
+    return redirect(
+        url_for("head.dashboard")
+    )
+
+
+# =========================================================
+# ADD HOLIDAY
+# =========================================================
+
+@admin_bp.route(
+    "/add-holiday",
+    methods=["POST"]
+)
+def add_holiday():
+
+    try:
+
+        d = datetime.strptime(
+            request.form["date"],
+            "%Y-%m-%d"
+        ).date()
+
+    except (ValueError, KeyError):
+
+        flash(
+            "Invalid holiday date.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("head.dashboard")
+        )
+
+    name = (
+        request.form
+        .get(
+            "name",
+            ""
+        )
+        .strip()
+    )
+
+    if not name:
+
+        flash(
+            "Holiday name is required.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("head.dashboard")
+        )
+
+    db.session.add(
+        Holiday(
+            name=name,
+            date=d,
+            holiday_type=request.form.get(
+                "holiday_type",
+                "Company"
+            )
+        )
+    )
+
+    db.session.commit()
+
+    flash(
+        "Holiday added to the calendar.",
+        "success"
+    )
+
+    return redirect(
+        url_for("head.dashboard")
+    )
+
+
+# =========================================================
+# RAISE APPRAISAL
+# =========================================================
+
+@admin_bp.route(
+    "/raise-appraisal",
+    methods=["POST"]
+)
+def raise_appraisal():
+
+    try:
+
+        employee_id = int(
+            request.form["employee_id"]
+        )
+
+    except (ValueError, KeyError):
+
+        flash(
+            "Invalid employee selected.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("head.dashboard")
+        )
+
+    employee = db.session.get(
+        User,
+        employee_id
+    )
+
+    if not employee:
+
+        flash(
+            "Employee could not be found.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("head.dashboard")
+        )
+
+    # -----------------------------------------------------
+    # REGULAR HEAD
+    # -----------------------------------------------------
+
+    if (
+        current_user.role == "head"
+        and employee.department != current_user.department
+    ):
+
+        flash(
+            "You can only raise an appraisal for an "
+            "employee in your department.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("head.dashboard")
+        )
+
+    if employee.role != "employee":
+
+        flash(
+            "Appraisals can only be raised for employees.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("head.dashboard")
+        )
+
+    cycle = (
+        request.form
+        .get(
+            "cycle",
+            ""
+        )
+        .strip()
+    )
+
+    if not cycle:
+
+        flash(
+            "Appraisal cycle is required.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("head.dashboard")
+        )
+
+    next_date = None
+
+    if request.form.get("next_date"):
+
+        try:
+
+            next_date = datetime.strptime(
+                request.form["next_date"],
+                "%Y-%m-%d"
+            ).date()
+
+        except ValueError:
+
+            flash(
+                "Invalid appraisal date.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("head.dashboard")
+            )
+
+    db.session.add(
+        Appraisal(
+            employee_id=employee.employee_id,
+            department=employee.department,
+            cycle=cycle,
+            stage="Raised",
+            completion=10,
+            next_date=next_date,
+            raised_by=current_user.name
+        )
+    )
+
+    db.session.commit()
+
+    flash(
+        "Appraisal raised.",
+        "success"
+    )
+
+    return redirect(
+        url_for("head.dashboard")
+    )
