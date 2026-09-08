@@ -33,17 +33,17 @@ admin_bp = Blueprint("head", __name__)
 
 
 # =========================================================
-# DEPARTMENT HEAD ACCESS
+# DEPARTMENT HEAD / ADMIN ACCESS
 # =========================================================
 
 @admin_bp.before_request
 @login_required
 def protect():
 
-    if current_user.role != "head":
+    if current_user.role not in ("head", "admin"):
 
         flash(
-            "Only department heads can access this section.",
+            "You do not have permission to access this section.",
             "danger"
         )
 
@@ -53,67 +53,139 @@ def protect():
 
 
 # =========================================================
-# DEPARTMENT HEAD DASHBOARD
+# DEPARTMENT HEAD / ADMIN DASHBOARD
 # =========================================================
 
 @admin_bp.route("/")
 def dashboard():
 
-    # Requests specifically forwarded to this department head
-    pending = (
-        LeaveRequest.query
-        .filter(
-            LeaveRequest.forwarded_to == current_user.email,
-            LeaveRequest.status == "Pending"
-        )
-        .order_by(
-            LeaveRequest.created_at.desc()
-        )
-        .all()
-    )
+    # -----------------------------------------------------
+    # ADMIN / GENERAL MANAGER
+    #
+    # Can see ALL pending leave requests.
+    # -----------------------------------------------------
 
-    # Employees belonging to this department
-    employees = (
-        User.query
-        .filter_by(
-            department=current_user.department,
-            role="employee"
-        )
-        .all()
-    )
+    if current_user.role == "admin":
 
-    appraisals = (
-        Appraisal.query
-        .filter_by(
-            department=current_user.department
+        pending = (
+            LeaveRequest.query
+            .filter(
+                LeaveRequest.status == "Pending"
+            )
+            .order_by(
+                LeaveRequest.created_at.desc()
+            )
+            .all()
         )
-        .order_by(
-            Appraisal.created_at.desc()
-        )
-        .all()
-    )
 
-    audits = (
-        Audit.query
-        .filter_by(
-            department=current_user.department
+        employees = (
+            User.query
+            .filter_by(
+                role="employee"
+            )
+            .order_by(
+                User.department,
+                User.name
+            )
+            .all()
         )
-        .order_by(
-            Audit.audit_date
-        )
-        .all()
-    )
 
-    sops = (
-        SOP.query
-        .filter_by(
-            department=current_user.department
+        appraisals = (
+            Appraisal.query
+            .order_by(
+                Appraisal.created_at.desc()
+            )
+            .all()
         )
-        .order_by(
-            SOP.uploaded_at.desc()
+
+        audits = (
+            Audit.query
+            .order_by(
+                Audit.audit_date
+            )
+            .all()
         )
-        .all()
-    )
+
+        sops = (
+            SOP.query
+            .order_by(
+                SOP.uploaded_at.desc()
+            )
+            .all()
+        )
+
+    # -----------------------------------------------------
+    # REGULAR DEPARTMENT HEAD
+    #
+    # Can see requests specifically forwarded to them and
+    # manages only their own department's records.
+    # -----------------------------------------------------
+
+    else:
+
+        pending = (
+            LeaveRequest.query
+            .filter(
+                LeaveRequest.forwarded_to
+                == current_user.email,
+
+                LeaveRequest.status
+                == "Pending"
+            )
+            .order_by(
+                LeaveRequest.created_at.desc()
+            )
+            .all()
+        )
+
+        employees = (
+            User.query
+            .filter_by(
+                department=current_user.department,
+                role="employee"
+            )
+            .order_by(
+                User.name
+            )
+            .all()
+        )
+
+        appraisals = (
+            Appraisal.query
+            .filter_by(
+                department=current_user.department
+            )
+            .order_by(
+                Appraisal.created_at.desc()
+            )
+            .all()
+        )
+
+        audits = (
+            Audit.query
+            .filter_by(
+                department=current_user.department
+            )
+            .order_by(
+                Audit.audit_date
+            )
+            .all()
+        )
+
+        sops = (
+            SOP.query
+            .filter_by(
+                department=current_user.department
+            )
+            .order_by(
+                SOP.uploaded_at.desc()
+            )
+            .all()
+        )
+
+    # -----------------------------------------------------
+    # COMMON DATA
+    # -----------------------------------------------------
 
     holidays = (
         Holiday.query
@@ -159,20 +231,46 @@ def leave_action(id, action):
         id
     )
 
-    # -----------------------------------------------------
-    # IMPORTANT:
-    # Only the department head selected by the employee
-    # can approve/reject the request.
-    # -----------------------------------------------------
-
-    if (
-        not req
-        or req.forwarded_to != current_user.email
-        or req.status != "Pending"
-    ):
+    if not req:
 
         flash(
-            "This request is not available to you.",
+            "Leave request could not be found.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("head.dashboard")
+        )
+
+    # -----------------------------------------------------
+    # REGULAR HEAD
+    #
+    # Only the selected recipient can approve/reject.
+    # -----------------------------------------------------
+
+    if current_user.role == "head":
+
+        if req.forwarded_to != current_user.email:
+
+            flash(
+                "This request was not forwarded to you.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("head.dashboard")
+            )
+
+    # -----------------------------------------------------
+    # ADMIN / GM
+    #
+    # Can approve/reject requests from ALL departments.
+    # -----------------------------------------------------
+
+    if req.status != "Pending":
+
+        flash(
+            "This request has already been processed.",
             "danger"
         )
 
@@ -201,7 +299,10 @@ def leave_action(id, action):
 
     req.head_comment = (
         request.form
-        .get("comment", "")
+        .get(
+            "comment",
+            ""
+        )
         .strip()
     )
 
@@ -358,7 +459,7 @@ def upload_sop():
     db.session.commit()
 
     flash(
-        "SOP uploaded for your department.",
+        "SOP uploaded successfully.",
         "success"
     )
 
@@ -408,7 +509,10 @@ def add_audit():
 
     audit_type = (
         request.form
-        .get("audit_type", "")
+        .get(
+            "audit_type",
+            ""
+        )
         .strip()
     )
 
@@ -428,13 +532,19 @@ def add_audit():
 
     name = (
         request.form
-        .get("name", "")
+        .get(
+            "name",
+            ""
+        )
         .strip()
     )
 
     auditor = (
         request.form
-        .get("auditor", "")
+        .get(
+            "auditor",
+            ""
+        )
         .strip()
     )
 
@@ -449,9 +559,33 @@ def add_audit():
             url_for("head.dashboard")
         )
 
+    # -----------------------------------------------------
+    # ADMIN / GM CAN SELECT A DEPARTMENT.
+    # REGULAR HEAD USES THEIR OWN DEPARTMENT.
+    # -----------------------------------------------------
+
+    if current_user.role == "admin":
+
+        audit_department = (
+            request.form
+            .get(
+                "department",
+                ""
+            )
+            .strip()
+        )
+
+        if not audit_department:
+
+            audit_department = current_user.department
+
+    else:
+
+        audit_department = current_user.department
+
     audit = Audit(
         name=name,
-        department=current_user.department,
+        department=audit_department,
         audit_type=audit_type,
         auditor=auditor,
         audit_date=audit_date,
@@ -463,7 +597,7 @@ def add_audit():
     db.session.commit()
 
     # -----------------------------------------------------
-    # Save to audits.csv as well so sync does not remove it.
+    # ALSO SAVE TO CSV
     # -----------------------------------------------------
 
     csv_path = (
@@ -509,7 +643,7 @@ def add_audit():
 
         writer.writerow({
             "name": name,
-            "department": current_user.department,
+            "department": audit_department,
             "audit_type": audit_type,
             "auditor": auditor,
             "audit_date": audit_date.isoformat(),
@@ -561,7 +695,10 @@ def add_holiday():
 
     name = (
         request.form
-        .get("name", "")
+        .get(
+            "name",
+            ""
+        )
         .strip()
     )
 
@@ -631,10 +768,24 @@ def raise_appraisal():
         employee_id
     )
 
+    if not employee:
+
+        flash(
+            "Employee could not be found.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("head.dashboard")
+        )
+
+    # -----------------------------------------------------
+    # REGULAR HEAD
+    # -----------------------------------------------------
+
     if (
-        not employee
-        or employee.department != current_user.department
-        or employee.role != "employee"
+        current_user.role == "head"
+        and employee.department != current_user.department
     ):
 
         flash(
@@ -647,9 +798,23 @@ def raise_appraisal():
             url_for("head.dashboard")
         )
 
+    if employee.role != "employee":
+
+        flash(
+            "Appraisals can only be raised for employees.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("head.dashboard")
+        )
+
     cycle = (
         request.form
-        .get("cycle", "")
+        .get(
+            "cycle",
+            ""
+        )
         .strip()
     )
 
