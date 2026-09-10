@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Department Head Dashboard · EMS{% endblock %}
+{% block title %}Department Head Dashboard · BOBBA LOGISTICS EMS{% endblock %}
 
 {% block content %}
 
@@ -51,8 +51,11 @@
             </strong>
 
             <p>
-                {{ req.leave_type }}
-                · {{ req.days }} day(s)
+                {{ req.leave_type }} requested
+                · {{ req.days }} calendar day(s)
+                {% if req.holiday_days %}
+                ({{ req.holiday_days }} holiday, {{ req.chargeable_display }} chargeable)
+                {% endif %}
                 · {{ req.start_date }}
                 to
                 {{ req.end_date }}
@@ -86,7 +89,46 @@
             action="{{ url_for('head.leave_action', id=req.id, action='approve') }}"
         >
 
-            <div>
+            <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 8px;">
+
+                <div>
+                    <label for="paid_days_{{ req.id }}">
+                        Paid days
+                    </label>
+                    <input
+                        type="number"
+                        id="paid_days_{{ req.id }}"
+                        name="paid_days"
+                        min="0"
+                        max="{{ req.chargeable_display }}"
+                        value="{{ req.default_paid_days }}"
+                    >
+                </div>
+
+                <div>
+                    <label for="unpaid_days_{{ req.id }}">
+                        Unpaid days
+                    </label>
+                    <input
+                        type="number"
+                        id="unpaid_days_{{ req.id }}"
+                        name="unpaid_days"
+                        min="0"
+                        max="{{ req.chargeable_display }}"
+                        value="{{ req.default_unpaid_days }}"
+                    >
+                </div>
+
+            </div>
+
+            <small class="muted">
+                Must add up to {{ req.chargeable_display }} chargeable
+                day(s){% if req.holiday_days %} — {{ req.holiday_days }}
+                holiday day(s) already excluded{% endif %}. Split
+                between paid and unpaid as needed.
+            </small>
+
+            <div style="margin-top: 8px;">
 
                 <input
                     type="text"
