@@ -9,7 +9,8 @@ from flask import (
     redirect,
     url_for,
     flash,
-    current_app
+    current_app,
+    abort
 )
 
 from flask_login import login_required, current_user
@@ -25,7 +26,9 @@ from .models import (
     Holiday,
     CommonURL,
     Training,
-    SyncLog
+    SyncLog,
+    Event,
+    EventPhoto
 )
 
 
@@ -146,33 +149,6 @@ def dashboard():
             .all()
         )
 
-    # -----------------------------------------------------
-    # NEW
-    # Attach the default paid/unpaid split for each pending
-    # request so the approval form can pre-fill it (the head
-    # can still edit it before approving). This mirrors the
-    # employee's originally requested type but is expressed
-    # in chargeable days, i.e. with holidays already excluded.
-    # -----------------------------------------------------
-
-    for req in pending:
-
-        chargeable = (
-            req.chargeable_days
-            if req.chargeable_days is not None
-            else req.days
-        )
-
-        req.default_paid_days = (
-            chargeable if req.leave_type == "Paid" else 0
-        )
-
-        req.default_unpaid_days = (
-            chargeable if req.leave_type != "Paid" else 0
-        )
-
-        req.chargeable_display = chargeable
-
         employees = (
             User.query
             .filter_by(
@@ -232,6 +208,39 @@ def dashboard():
         )
 
     # -----------------------------------------------------
+    # NEW
+    # Attach the default paid/unpaid split for each pending
+    # request so the approval form can pre-fill it (the head
+    # can still edit it before approving). This mirrors the
+    # employee's originally requested type but is expressed
+    # in chargeable days, i.e. with holidays already excluded.
+    #
+    # This loop only sets per-request display attributes — it
+    # must NOT contain any of the queries above, or those
+    # queries silently stop running whenever `pending` is
+    # empty (which is exactly when a head has no pending
+    # leave requests to approve).
+    # -----------------------------------------------------
+
+    for req in pending:
+
+        chargeable = (
+            req.chargeable_days
+            if req.chargeable_days is not None
+            else req.days
+        )
+
+        req.default_paid_days = (
+            chargeable if req.leave_type == "Paid" else 0
+        )
+
+        req.default_unpaid_days = (
+            chargeable if req.leave_type != "Paid" else 0
+        )
+
+        req.chargeable_display = chargeable
+
+    # -----------------------------------------------------
     # COMMON DATA
     # -----------------------------------------------------
 
@@ -252,6 +261,17 @@ def dashboard():
         .all()
     )
 
+    # Events are visible to every head, and every head (not
+    # just the admin) gets the "add event" / "upload photos"
+    # forms in the template.
+    events = (
+        Event.query
+        .order_by(
+            Event.event_date.desc()
+        )
+        .all()
+    )
+
     return render_template(
         "head.html",
         pending=pending,
@@ -261,7 +281,8 @@ def dashboard():
         sops=sops,
         trainings=trainings,
         holidays=holidays,
-        sync_logs=sync_logs
+        sync_logs=sync_logs,
+        events=events
     )
 
 
@@ -1177,6 +1198,161 @@ def raise_appraisal():
         "Appraisal raised.",
         "success"
     )
+
+    return redirect(
+        url_for("head.dashboard")
+    )
+
+
+# =========================================================
+# COMPANY EVENTS (any department head or admin)
+#
+# Any department head (or the admin/General Manager) can
+# create events and attach photos to them. The blueprint-
+# level `protect()` above already restricts this whole
+# section to role in ("head", "admin"), so no further role
+# check is needed here. Employees can view events (see
+# main.events) but not add to them.
+# =========================================================
+
+@admin_bp.route(
+    "/events/add",
+    methods=["POST"]
+)
+def add_event():
+
+    title = (
+        request.form
+        .get("title", "")
+        .strip()
+    )
+
+    try:
+
+        event_date = datetime.strptime(
+            request.form["event_date"],
+            "%Y-%m-%d"
+        ).date()
+
+    except (ValueError, KeyError):
+
+        flash(
+            "Invalid event date.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("head.dashboard")
+        )
+
+    if not title:
+
+        flash(
+            "Event title is required.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("head.dashboard")
+        )
+
+    db.session.add(
+        Event(
+            title=title,
+            description=request.form.get(
+                "description", ""
+            ).strip(),
+            event_date=event_date,
+            created_by=current_user.name
+        )
+    )
+
+    db.session.commit()
+
+    flash(
+        "Event added.",
+        "success"
+    )
+
+    return redirect(
+        url_for("head.dashboard")
+    )
+
+
+@admin_bp.route(
+    "/events/<int:event_id>/photos",
+    methods=["POST"]
+)
+def upload_event_photos(event_id):
+
+    event = db.session.get(Event, event_id)
+
+    if not event:
+        abort(404)
+
+    files = request.files.getlist("photos")
+
+    upload_folder = Path(
+        current_app.config["UPLOAD_FOLDER"]
+    )
+
+    upload_folder.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    saved = 0
+
+    for f in files:
+
+        if not f or not f.filename:
+            continue
+
+        base_name = secure_filename(f.filename)
+
+        if not base_name:
+            continue
+
+        # Prefixed with event id + timestamp so photos from
+        # different events (or with generic camera filenames
+        # like IMG_0001.jpg) never collide in the shared
+        # uploads folder.
+        filename = (
+            f"event{event_id}_"
+            f"{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}_"
+            f"{base_name}"
+        )
+
+        f.save(upload_folder / filename)
+
+        db.session.add(
+            EventPhoto(
+                event_id=event_id,
+                filename=filename,
+                caption=request.form.get(
+                    "caption", ""
+                ).strip(),
+                uploaded_by=current_user.name
+            )
+        )
+
+        saved += 1
+
+    db.session.commit()
+
+    if saved:
+
+        flash(
+            f"{saved} photo(s) uploaded to \"{event.title}\".",
+            "success"
+        )
+
+    else:
+
+        flash(
+            "No photos were uploaded.",
+            "danger"
+        )
 
     return redirect(
         url_for("head.dashboard")
