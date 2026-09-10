@@ -189,6 +189,40 @@ class LeaveRequest(db.Model):
         default="Pending"
     )
 
+    # -----------------------------------------------------
+    # NEW
+    # Company holidays that fall inside [start_date, end_date]
+    # don't consume leave balance. `days` stays the full
+    # calendar span (for display); `chargeable_days` is what
+    # actually gets deducted on approval.
+    # -----------------------------------------------------
+
+    holiday_days = db.Column(
+        db.Integer,
+        default=0
+    )
+
+    chargeable_days = db.Column(
+        db.Integer
+    )
+
+    # -----------------------------------------------------
+    # NEW
+    # The head approving the request can split the chargeable
+    # days between paid and unpaid instead of it being forced
+    # to match the employee's originally requested leave_type.
+    # -----------------------------------------------------
+
+    approved_paid_days = db.Column(
+        db.Integer,
+        default=0
+    )
+
+    approved_unpaid_days = db.Column(
+        db.Integer,
+        default=0
+    )
+
     head_comment = db.Column(
         db.Text
     )
