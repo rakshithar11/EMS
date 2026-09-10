@@ -1141,6 +1141,157 @@
 
 
 <!-- =====================================================
+     COMPANY EVENTS (any department head, or admin)
+     ===================================================== -->
+
+<section class="panel">
+
+    <h2>Company Events</h2>
+
+    <p class="muted">
+        Add company events, and once they've taken place, upload
+        photos from them. Visible to every employee and head once
+        added.
+    </p>
+
+    <form
+        method="POST"
+        action="{{ url_for('head.add_event') }}"
+    >
+
+        <div class="form-grid">
+
+            <div>
+
+                <label>
+                    Event Title
+                </label>
+
+                <input
+                    type="text"
+                    name="title"
+                    placeholder="e.g. Annual Day 2026"
+                    required
+                >
+
+            </div>
+
+
+            <div>
+
+                <label>
+                    Date
+                </label>
+
+                <input
+                    type="date"
+                    name="event_date"
+                    required
+                >
+
+            </div>
+
+
+            <div style="grid-column: 1 / -1;">
+
+                <label>
+                    Description
+                </label>
+
+                <textarea
+                    name="description"
+                    rows="3"
+                    placeholder="What's the event about?"
+                ></textarea>
+
+            </div>
+
+        </div>
+
+
+        <div style="margin-top: 16px;">
+
+            <button
+                type="submit"
+                class="button"
+            >
+                Add Event
+            </button>
+
+        </div>
+
+    </form>
+
+
+    <hr>
+
+
+    {% for e in events %}
+
+    <div class="list-row" style="align-items: flex-start;">
+
+        <div style="flex: 1;">
+
+            <strong>
+                {{ e.title }}
+            </strong>
+
+            <small class="muted">
+                {{ e.event_date.strftime('%d %b %Y') }}
+                · {{ e.photos|length }} photo(s)
+            </small>
+
+            {% if e.description %}
+            <p>{{ e.description }}</p>
+            {% endif %}
+
+            <form
+                method="POST"
+                action="{{ url_for('head.upload_event_photos', event_id=e.id) }}"
+                enctype="multipart/form-data"
+                style="margin-top: 8px;"
+            >
+
+                <input
+                    type="file"
+                    name="photos"
+                    accept="image/*"
+                    multiple
+                    required
+                >
+
+                <input
+                    type="text"
+                    name="caption"
+                    placeholder="Caption (optional — applies to every photo in this upload)"
+                >
+
+                <button
+                    type="submit"
+                    class="button secondary"
+                    style="margin-top: 6px;"
+                >
+                    Upload Photos
+                </button>
+
+            </form>
+
+        </div>
+
+    </div>
+
+    {% else %}
+
+    <p class="muted">
+        No events added yet.
+    </p>
+
+    {% endfor %}
+
+</section>
+
+
+<!-- =====================================================
      SYNC LOG
      ===================================================== -->
 
