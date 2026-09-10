@@ -49,6 +49,9 @@ def create_app():
     with app.app_context():
         db.create_all()
 
+        from .migrate import run_auto_migrations
+        run_auto_migrations(db.engine)
+
         from .seed import seed
         seed()
 
