@@ -26,7 +26,9 @@ from .models import (
     Audit,
     Department,
     CommonURL,
-    User
+    User,
+    Event,
+    EventPhoto
 )
 
 
@@ -986,4 +988,79 @@ def resources():
             .all()
         ),
         q=q
+    )
+
+
+# =========================================================
+# COMPANY EVENTS (view — everyone)
+#
+# Adding events / uploading photos is admin-only, handled in
+# head.py (see head.add_event / head.upload_event_photos).
+# This page just lists them for everyone to browse.
+# =========================================================
+
+@main_bp.route(
+    "/events"
+)
+@login_required
+def events():
+
+    all_events = (
+        Event.query
+        .order_by(
+            Event.event_date.desc()
+        )
+        .all()
+    )
+
+    return render_template(
+        "events.html",
+        events=all_events,
+        today=date.today()
+    )
+
+
+@main_bp.route(
+    "/events/photo/<int:photo_id>"
+)
+@login_required
+def event_photo(photo_id):
+
+    photo = db.session.get(
+        EventPhoto,
+        photo_id
+    )
+
+    if not photo:
+        abort(404)
+
+    file_path = (
+        Path(
+            current_app.config["UPLOAD_FOLDER"]
+        )
+        / photo.filename
+    )
+
+    if not file_path.exists():
+        abort(404)
+
+    return send_from_directory(
+        current_app.config["UPLOAD_FOLDER"],
+        photo.filename,
+        as_attachment=False
+    )
+
+
+# =========================================================
+# ABOUT THE COMPANY
+# =========================================================
+
+@main_bp.route(
+    "/about"
+)
+@login_required
+def about():
+
+    return render_template(
+        "about.html"
     )
