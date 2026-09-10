@@ -146,6 +146,33 @@ def dashboard():
             .all()
         )
 
+    # -----------------------------------------------------
+    # NEW
+    # Attach the default paid/unpaid split for each pending
+    # request so the approval form can pre-fill it (the head
+    # can still edit it before approving). This mirrors the
+    # employee's originally requested type but is expressed
+    # in chargeable days, i.e. with holidays already excluded.
+    # -----------------------------------------------------
+
+    for req in pending:
+
+        chargeable = (
+            req.chargeable_days
+            if req.chargeable_days is not None
+            else req.days
+        )
+
+        req.default_paid_days = (
+            chargeable if req.leave_type == "Paid" else 0
+        )
+
+        req.default_unpaid_days = (
+            chargeable if req.leave_type != "Paid" else 0
+        )
+
+        req.chargeable_display = chargeable
+
         employees = (
             User.query
             .filter_by(
@@ -330,44 +357,47 @@ def leave_action(id, action):
 
     # =====================================================
     # APPROVE
+    #
+    # The approving head can split the chargeable days
+    # between paid and unpaid instead of it being forced to
+    # match whatever the employee originally selected.
+    #
+    # chargeable_days already has company holidays in the
+    # requested range excluded, so that's what paid_days +
+    # unpaid_days must add up to — not the raw calendar span.
     # =====================================================
 
     if action == "approve":
 
-        if req.leave_type == "Paid":
+        required_days = (
+            req.chargeable_days
+            if req.chargeable_days is not None
+            else req.days
+        )
 
-            remaining = (
-                employee.paid_leave_limit
-                - employee.paid_leave_used
-            )
+        paid_days_raw = request.form.get("paid_days")
+        unpaid_days_raw = request.form.get("unpaid_days")
 
-            if req.days > remaining:
+        if paid_days_raw is None and unpaid_days_raw is None:
 
-                flash(
-                    "Approval blocked: employee does not "
-                    "have enough paid leave.",
-                    "danger"
-                )
+            # No split was submitted — fall back to the
+            # employee's originally requested type, unchanged.
 
-                return redirect(
-                    url_for("head.dashboard")
-                )
-
-            employee.paid_leave_used += req.days
+            if req.leave_type == "Paid":
+                paid_days, unpaid_days = required_days, 0
+            else:
+                paid_days, unpaid_days = 0, required_days
 
         else:
 
-            remaining = (
-                employee.total_leave
-                - employee.paid_leave_used
-                - employee.unpaid_leave_used
-            )
+            try:
+                paid_days = int(paid_days_raw or 0)
+                unpaid_days = int(unpaid_days_raw or 0)
 
-            if req.days > remaining:
+            except ValueError:
 
                 flash(
-                    "Approval blocked: employee does not "
-                    "have enough total leave.",
+                    "Paid/unpaid day split must be whole numbers.",
                     "danger"
                 )
 
@@ -375,8 +405,71 @@ def leave_action(id, action):
                     url_for("head.dashboard")
                 )
 
-            employee.unpaid_leave_used += req.days
+        if paid_days < 0 or unpaid_days < 0:
 
+            flash(
+                "Paid/unpaid days cannot be negative.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("head.dashboard")
+            )
+
+        if paid_days + unpaid_days != required_days:
+
+            flash(
+                f"Paid + unpaid days must add up to "
+                f"{required_days} chargeable day(s) "
+                f"({req.holiday_days or 0} holiday day(s) "
+                f"already excluded).",
+                "danger"
+            )
+
+            return redirect(
+                url_for("head.dashboard")
+            )
+
+        paid_remaining = (
+            employee.paid_leave_limit
+            - employee.paid_leave_used
+        )
+
+        if paid_days > paid_remaining:
+
+            flash(
+                "Approval blocked: employee only has "
+                f"{paid_remaining} paid leave day(s) remaining.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("head.dashboard")
+            )
+
+        total_remaining = (
+            employee.total_leave
+            - employee.paid_leave_used
+            - employee.unpaid_leave_used
+        )
+
+        if (paid_days + unpaid_days) > total_remaining:
+
+            flash(
+                "Approval blocked: employee only has "
+                f"{total_remaining} total leave day(s) remaining.",
+                "danger"
+            )
+
+            return redirect(
+                url_for("head.dashboard")
+            )
+
+        employee.paid_leave_used += paid_days
+        employee.unpaid_leave_used += unpaid_days
+
+        req.approved_paid_days = paid_days
+        req.approved_unpaid_days = unpaid_days
         req.status = "Approved"
 
     # =====================================================
