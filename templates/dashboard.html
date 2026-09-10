@@ -1,6 +1,5 @@
-
 {% extends "base.html" %}
-{% block title %}Dashboard · EMS{% endblock %}
+{% block title %}Dashboard · BOBBA LOGISTICS EMS{% endblock %}
 {% block content %}
 <div class="between"><div><h1>Employee Dashboard</h1><p class="muted">{{current_user.name}} · {{current_user.department}}</p></div>
 {% if today_att and today_att.check_in and not today_att.check_out %}<span class="badge">Attendance logged today</span>{% endif %}</div>
