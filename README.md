@@ -1,5 +1,4 @@
-
-# Employee Management System — updated prototype
+# Bobba Logistics EMS — updated prototype
 
 ## Access model
 
