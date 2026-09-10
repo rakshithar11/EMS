@@ -416,6 +416,28 @@ def leave():
         ).days + 1
 
 
+        # ---------------------------------------------------
+        # NEW
+        # Company holidays inside [start, end] don't consume
+        # leave balance. Only the remaining days are
+        # "chargeable" against paid/unpaid balance.
+        # ---------------------------------------------------
+
+        holiday_days = (
+            Holiday.query
+            .filter(
+                Holiday.date >= start,
+                Holiday.date <= end
+            )
+            .count()
+        )
+
+        chargeable_days = max(
+            0,
+            days - holiday_days
+        )
+
+
         leave_type = (
             request.form
             .get(
@@ -501,6 +523,11 @@ def leave():
 
         # -------------------------------------------------
         # VALIDATE DAYS
+        #
+        # Validation runs against chargeable_days (calendar
+        # days minus any company holidays in range), not the
+        # raw calendar span, since holiday days need no leave
+        # balance at all.
         # -------------------------------------------------
 
         if days <= 0:
@@ -510,20 +537,25 @@ def leave():
                 "danger"
             )
 
-        elif days > total_remaining:
+        elif chargeable_days > total_remaining:
 
             flash(
-                f"Only {total_remaining} total leave day(s) remain.",
+                f"Only {total_remaining} total leave day(s) remain. "
+                f"This request needs {chargeable_days} chargeable "
+                f"day(s) ({holiday_days} of the {days} calendar "
+                f"day(s) already fall on a company holiday).",
                 "danger"
             )
 
         elif (
             leave_type == "Paid"
-            and days > paid_remaining
+            and chargeable_days > paid_remaining
         ):
 
             flash(
-                f"Only {paid_remaining} paid leave day(s) remain.",
+                f"Only {paid_remaining} paid leave day(s) remain, "
+                f"but this request needs {chargeable_days} paid "
+                f"day(s) after excluding {holiday_days} holiday day(s).",
                 "danger"
             )
 
@@ -581,6 +613,10 @@ def leave():
 
                 days=days,
 
+                holiday_days=holiday_days,
+
+                chargeable_days=chargeable_days,
+
                 reason=request.form.get(
                     "reason",
                     ""
@@ -599,9 +635,16 @@ def leave():
 
             db.session.commit()
 
+            holiday_note = (
+                f" ({holiday_days} of {days} day(s) fall on a "
+                f"company holiday and won't be charged)"
+                if holiday_days
+                else ""
+            )
+
             flash(
                 f"Holiday/leave request forwarded to "
-                f"{selected_head.name}.",
+                f"{selected_head.name}{holiday_note}.",
                 "success"
             )
 
@@ -662,12 +705,24 @@ def leave():
     )
 
 
+    # -----------------------------------------------------
+    # Holiday dates, for the live "chargeable days" preview
+    # on the request form. The server still recalculates and
+    # enforces this on submit — this is just a UI convenience.
+    # -----------------------------------------------------
+
+    holiday_dates = [
+        holiday.date.isoformat()
+        for holiday in Holiday.query.all()
+    ]
+
     return render_template(
         "leave.html",
         requests=requests,
         paid_remaining=paid_remaining,
         total_remaining=total_remaining,
-        department_heads=department_heads
+        department_heads=department_heads,
+        holiday_dates=holiday_dates
     )
 
 
