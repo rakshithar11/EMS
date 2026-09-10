@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Company Events · BOBBA LOGISTICS EMS{% endblock %}
+{% block content %}
+
+<div class="between">
+    <div>
+        <h1>Company Events</h1>
+        <p class="muted">
+            Company-wide events, and photos from events that have
+            already taken place.
+        </p>
+    </div>
+</div>
+
+{% for e in events %}
+
+<section class="panel">
+
+    <div class="between">
+
+        <div>
+            <h2>{{ e.title }}</h2>
+            <small class="muted">
+                {{ e.event_date.strftime('%d %b %Y') }}
+                {% if e.created_by %} · Added by {{ e.created_by }}{% endif %}
+            </small>
+        </div>
+
+        <span class="badge">
+            {% if e.event_date >= today %}Upcoming{% else %}Past{% endif %}
+        </span>
+
+    </div>
+
+    {% if e.description %}
+    <p>{{ e.description }}</p>
+    {% endif %}
+
+    {% if e.photos %}
+
+    <div class="grid three" style="margin-top: 14px;">
+        {% for p in e.photos %}
+        <a
+            href="{{ url_for('main.event_photo', photo_id=p.id) }}"
+            target="_blank"
+            rel="noopener"
+        >
+            <img
+                src="{{ url_for('main.event_photo', photo_id=p.id) }}"
+                alt="{{ p.caption or e.title }}"
+                style="width: 100%; border-radius: 8px; display: block; object-fit: cover; aspect-ratio: 4 / 3;"
+            >
+            {% if p.caption %}
+            <small class="muted">{{ p.caption }}</small>
+            {% endif %}
+        </a>
+        {% endfor %}
+    </div>
+
+    {% else %}
+
+    <p class="muted" style="margin-top: 10px;">
+        No photos uploaded yet.
+    </p>
+
+    {% endif %}
+
+</section>
+
+{% else %}
+
+<section class="panel">
+    No company events have been added yet.
+</section>
+
+{% endfor %}
+
+{% endblock %}
