@@ -555,6 +555,88 @@ class CommonURL(db.Model):
 
 
 # =========================================================
+# COMPANY EVENT
+# =========================================================
+#
+# Added by the admin (General Manager) only. Employees and
+# heads can view events and their photos, but only the admin
+# can create an event or attach photos to it afterwards.
+
+class Event(db.Model):
+
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+
+    title = db.Column(
+        db.String(200),
+        nullable=False
+    )
+
+    description = db.Column(
+        db.Text
+    )
+
+    event_date = db.Column(
+        db.Date,
+        nullable=False
+    )
+
+    created_by = db.Column(
+        db.String(120)
+    )
+
+    created_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow
+    )
+
+    photos = db.relationship(
+        "EventPhoto",
+        backref="event",
+        cascade="all, delete-orphan",
+        order_by="EventPhoto.uploaded_at"
+    )
+
+
+# =========================================================
+# EVENT PHOTO
+# =========================================================
+
+class EventPhoto(db.Model):
+
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+
+    event_id = db.Column(
+        db.Integer,
+        db.ForeignKey("event.id"),
+        nullable=False
+    )
+
+    filename = db.Column(
+        db.String(255),
+        nullable=False
+    )
+
+    caption = db.Column(
+        db.String(200)
+    )
+
+    uploaded_by = db.Column(
+        db.String(120)
+    )
+
+    uploaded_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow
+    )
+
+
+# =========================================================
 # SYNC LOG
 # =========================================================
 
