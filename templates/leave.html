@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Holiday / Leave · EMS{% endblock %}
+{% block title %}Holiday / Leave · BOBBA LOGISTICS EMS{% endblock %}
 
 {% block content %}
 
@@ -145,6 +145,11 @@
                     required
                 >
 
+                <small
+                    id="chargeable_preview"
+                    class="muted"
+                ></small>
+
             </div>
 
 
@@ -224,6 +229,58 @@
 
     </form>
 
+    <script>
+        // Live preview only — the server recalculates and enforces
+        // this on submit, so this can't be used to bypass validation.
+        (function () {
+            var holidayDates = {{ holiday_dates | tojson }};
+            var holidaySet = new Set(holidayDates);
+
+            var startInput = document.getElementById("start_date");
+            var endInput = document.getElementById("end_date");
+            var preview = document.getElementById("chargeable_preview");
+
+            function update() {
+                if (!startInput.value || !endInput.value) {
+                    preview.textContent = "";
+                    return;
+                }
+
+                var start = new Date(startInput.value);
+                var end = new Date(endInput.value);
+
+                if (end < start) {
+                    preview.textContent = "End date is before start date.";
+                    return;
+                }
+
+                var days = 0;
+                var holidayDays = 0;
+                var cursor = new Date(start);
+
+                while (cursor <= end) {
+                    days += 1;
+                    var iso = cursor.toISOString().slice(0, 10);
+                    if (holidaySet.has(iso)) {
+                        holidayDays += 1;
+                    }
+                    cursor.setDate(cursor.getDate() + 1);
+                }
+
+                var chargeable = Math.max(0, days - holidayDays);
+
+                preview.textContent = holidayDays
+                    ? days + " calendar day(s) · " + holidayDays +
+                      " holiday day(s) excluded · " + chargeable +
+                      " chargeable day(s)"
+                    : days + " day(s), none on a company holiday";
+            }
+
+            startInput.addEventListener("change", update);
+            endInput.addEventListener("change", update);
+        })();
+    </script>
+
 </section>
 
 
@@ -252,13 +309,15 @@
 
             <tr>
 
-                <th>Type</th>
+                <th>Type Requested</th>
 
                 <th>From</th>
 
                 <th>To</th>
 
                 <th>Days</th>
+
+                <th>Approved Split</th>
 
                 <th>Forwarded To</th>
 
@@ -294,6 +353,30 @@
 
                 <td>
                     {{ request.days }}
+
+                    {% if request.holiday_days %}
+                    <br>
+                    <small class="muted">
+                        {{ request.holiday_days }} holiday,
+                        {{ request.chargeable_days }} chargeable
+                    </small>
+                    {% endif %}
+                </td>
+
+
+                <td>
+
+                    {% if request.status == "Approved" %}
+
+                        {{ request.approved_paid_days or 0 }} paid
+                        · {{ request.approved_unpaid_days or 0 }} unpaid
+
+                    {% else %}
+
+                        —
+
+                    {% endif %}
+
                 </td>
 
 
@@ -339,7 +422,7 @@
 
             <tr>
 
-                <td colspan="7">
+                <td colspan="8">
 
                     No holiday or leave requests yet.
 
